@@ -8,7 +8,7 @@ AI-agent-driven software development lifecycle framework. Orchestrates specializ
 ┌──────────────────────────────────────────────────────────────────┐
 │                       CLAUDE.md (Orchestrator)                    │
 ├──────────────────────────────────────────────────────────────────┤
-│  Agents Layer       │  SE Agent  │  Dev Agent  │  Test Agent     │
+│  Agents Layer       │ Scanner │ SE Agent │ Dev Agent │ Test Agent│
 ├──────────────────────────────────────────────────────────────────┤
 │  Workflow Layer     │  Standard Lifecycle + Challenge + Plugin    │
 │                     │  + Dev-Story Shortcut                       │
@@ -139,33 +139,37 @@ Scan project root for build manifests in priority order: `package.json` → `tsc
 
 **No manifest:** List all file extensions, present top 3 to user for confirmation, then load/generate standards.
 
-### Step 0.2: Comprehensive File Scanning
-**Scan scope:** `src/`, `lib/`, `app/`, `test*/`, `__tests__/`, `spec/`, `config/`, `scripts/`, `static/`, `public/`, `assets/`, root config files.
-**Exclude:** `.git/`, `node_modules/`, `vendor/`, `.venv/`, `dist/`, `build/`, `target/`, `out/`, `.next/`, `coverage/`, `*.log`, `*.lock`, `__pycache__/`, `.idea/`, `.vscode/`, `framework/`, `plugins/`.
+### Step 0.2-0.4: Project Structure Scan → Delegate to Scanner Agent
 
-Detect organizational pattern (feature-based / layer-based / hybrid / flat / empty). Classify each file using decision tree (first match wins): test → asset → script → config → middleware → controller → repository → model → utility → entry → component → service → unknown. Record line count, barrel-export status, complexity flags (>200 lines).
+Steps 0.2 (File Scanning), 0.3 (Module Identification), and 0.4 (Dependency Analysis) are executed by the **Project Scanner Agent** (`framework/agents/project-scanner.skill.md`).
 
-**Empty project:** If 0 source files, skip Steps 0.3-0.4, go to Step 0.5 minimal mode.
+The scanner performs five phases:
+| Phase | Description | Key Output |
+|-------|-------------|------------|
+| **A. File Discovery** | Scan all source files, classify each by type, detect organizational pattern | File inventory with classifications |
+| **B. Shared Resource Detection** | Identify shared components, methods, and infrastructure used across 2+ modules | Shared component/method/infra catalogs |
+| **C. Module Boundaries** | Group files into modules, resolve path aliases, determine public API surfaces | Module inventory with import paths |
+| **D. Dependency Analysis** | Map all import edges, classify weights, detect circular/bidirectional deps | Dependency matrix + violation report |
+| **E. Generate Output** | Produce `docs/module-map.md`, `docs/.scanner-report.json`, architecture contributions | Machine-readable scan data |
 
-### Step 0.3: Identify Module Boundaries
-Group source files into modules using algorithm (in order): (1) explicit module markers (barrel `index.*` with exports), (2) framework-implied (`__init__.py`, Java packages), (3) feature directories (2+ files, 2+ different classifications), (4) layer directories, (5) single-file outliers. Infer module type: `utility`, `infrastructure`, `ui`, `core`, `business`.
+**Key differentiators from generic file scanning:**
+- **Shared vs. module-private:** Every component/utility is classified by its usage scope (shared if imported by 2+ modules)
+- **Path alias resolution:** All imports are resolved through `tsconfig.json` paths or equivalent to produce canonical module paths
+- **Reference relationship map:** Full directed graph showing which modules reference which, with edge weights
+- **Architecture rules for shared code:** Shared components MUST NOT import from feature modules; features SHOULD NOT directly import from other features
 
-For each module record: ID, name, type, path, file count, line count, per-file classification, public API surface. Produce summary inventory grouped by type.
-
-### Step 0.4: Analyze Module Dependencies
-Parse imports (ESM/CJS/dynamic for JS/TS; `import` for Java; `from X import Y` for Python). Resolve paths. Record dependency edges between modules. Classify weight: heavy (5+ files), medium (2-4), light (1), dynamic (lazy import). Classify direction: unidirectional (healthy), bidirectional (review), circular (VIOLATION).
-
-**Architecture rules:** Core→Business (ERROR), Core→UI (ERROR), Infrastructure→Business (ERROR), Utility→Any (WARNING), Circular (ERROR). Generate dependency matrix.
+The orchestrator invokes this skill during Phase 0 and on structural changes. See `framework/agents/project-scanner.skill.md` for the complete protocol.
 
 ### Step 0.5: Generate Documentation
-Produce 4 files in `docs/` (2 for empty projects):
+Produce files in `docs/` (minimal set for empty projects):
 
-| Document | Template |
-|----------|----------|
-| `docs/architecture.md` | `framework/artifacts/architecture-doc.template.md` |
-| `docs/module-map.md` | Cross-reference + per-module details |
+| Document | Source |
+|----------|--------|
+| `docs/architecture.md` | Data from Steps 0.1 + Scanner Agent (Phases C/D) |
+| `docs/module-map.md` | Scanner Agent (Phase E.1) |
 | `docs/coding-standards.md` | Copy/adapt from `framework/standards/coding-standards.<lang>.md` |
-| `docs/project-structure.md` | `framework/standards/project-structure.template.md` |
+| `docs/project-structure.md` | `framework/standards/project-structure.template.md` + detected pattern |
+| `docs/.scanner-report.json` | Scanner Agent (Phase E.2) — machine-readable scan data |
 
 `architecture.md` must include: project overview (Step 0.1), module architecture (Step 0.3), dependency graph with ASCII diagram (Step 0.4), data architecture, API architecture, cross-cutting concerns, evolution history. Mandatory ASCII diagrams: high-level architecture + module dependency graph.
 
@@ -446,6 +450,7 @@ Phase 5 → SE Agent reviews → ALL PASS → APPROVED → Phase 7
 
 | Skill File | Agent | Role |
 |-------------|-------|------|
+| `framework/agents/project-scanner.skill.md` | Scanner Agent | Project structure scanning, module mapping, shared resource detection, dependency analysis |
 | `framework/agents/se-agent.skill.md` | SE Agent | Architecture design, SE requirements, Code Review |
 | `framework/agents/dev-agent.skill.md` | Dev Agent | Story design, coding, challenge resolution |
 | `framework/agents/test-agent.skill.md` | Test Agent | Test planning, process validation |
@@ -459,7 +464,7 @@ H5LifecycleTemplate/
 ├── CLAUDE.md                              # Master orchestrator
 ├── .claude/settings.json                  # Harness settings
 ├── framework/
-│   ├── agents/                            # se-agent, dev-agent, test-agent .skill.md
+│   ├── agents/                            # project-scanner, se-agent, dev-agent, test-agent .skill.md
 │   ├── workflows/                         # standard-lifecycle, challenge-mechanism, plugin-extension .rule.md
 │   ├── artifacts/                         # prd, se-design, dev-story, test-plan, architecture-doc .template.md
 │   └── standards/                         # coding-standards (js/ts/java/python/template), project-structure, validation-standards
@@ -470,6 +475,7 @@ H5LifecycleTemplate/
     ├── module-map.md                      # Shared — file-to-module map (Phase 0)
     ├── coding-standards.md                # Shared — language standards (Phase 0)
     ├── project-structure.md               # Shared — directory conventions (Phase 0)
+    ├── .scanner-report.json               # Shared — machine-readable scan data (Phase 0)
     ├── challenges/
     │   └── index.md                       # Global challenge index (all requirements)
     ├── modules/                           # Per-module docs (large projects, Phase 0)

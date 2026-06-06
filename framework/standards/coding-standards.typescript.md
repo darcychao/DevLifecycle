@@ -361,6 +361,133 @@ import { UserService } from '@features/user/user-service.js';
 import { UserService } from '../../../features/user/user-service.js';
 ```
 
+### 7.4 模块组织（扫描驱动）
+
+项目初始化时，Scanner Agent 扫描全量代码并生成 `docs/module-map.md` 和 `docs/.scanner-report.json`。以下规则由扫描结果驱动，所有新增代码必须遵守。
+
+#### 7.4.1 组织模式遵循
+- **扫描检测到的组织模式**（feature-based / layer-based / hybrid）必须在整个项目中保持一致
+- 新增模块必须遵循已检测到的目录结构模式
+- 如需切换组织模式，必须先通过 SE Agent 设计迁移方案并更新 `docs/project-structure.md`
+
+```typescript
+// Feature-based 项目（扫描检测到 src/features/ 结构）
+// 正确：新功能放入独立 feature 目录
+src/features/payment/
+├── components/
+├── services/
+├── types/
+└── index.ts
+
+// 错误：在 feature-based 项目中创建顶层 layer 目录
+src/services/payment-service.ts  // 破坏了 feature-based 模式
+```
+
+#### 7.4.2 共享组件放置
+- **Scanner 标记为 Shared 的组件**必须保留在共享目录中（如 `src/shared/components/`）
+- 新增的跨模块组件（被 2+ 模块使用）必须放入共享目录，**不得**放入任何单一 feature 目录
+- 仅被单一模块使用的组件保持在该模块目录内
+
+```typescript
+// Button 被 auth、dashboard、settings 三个模块使用 → 共享组件
+// 正确位置
+src/shared/components/Button.tsx
+
+// 错误位置
+src/features/auth/components/Button.tsx  // 其他模块无法合理引用
+```
+
+#### 7.4.3 共享方法/工具函数放置
+- **Scanner 标记为 Shared Method 的函数**必须保留在共享工具目录中（如 `src/shared/utils/`）
+- 新增的被 2+ 模块引用的工具函数必须放入共享目录
+- 单一模块专用的工具函数保持在模块内的 `utils/` 目录
+- Scanner 标记为 Dead Code Candidate 的未引用导出应删除
+
+```typescript
+// formatDate 被 4 个模块使用 → 共享方法
+// 正确位置
+src/shared/utils/date.ts
+
+// 仅在 auth 模块内使用 → 模块私有工具
+// 正确位置
+src/features/auth/utils/password-validator.ts
+```
+
+#### 7.4.4 模块依赖规则
+Scanner 生成的依赖矩阵定义了模块间的合法依赖关系。新增代码不得违反以下规则：
+
+| 规则 | 说明 | 严重级别 |
+|------|------|----------|
+| **Core → Business 禁止** | 入口/启动模块不得依赖业务模块 | ERROR |
+| **Core → UI 禁止** | 入口/启动模块不得依赖 UI 模块 | ERROR |
+| **Infrastructure → Business 禁止** | 基础设施模块不得依赖业务模块 | ERROR |
+| **Utility → 任何项目模块 警告** | 工具模块应零依赖或仅依赖标准库 | WARNING |
+| **Shared → Feature 禁止** | 共享组件/方法不得依赖任何 feature 模块 | ERROR |
+| **Feature → Feature 直接引用 警告** | Feature 间直接引用应通过 shared 层 | WARNING |
+| **循环依赖 禁止** | A→B→A 或 A→B→C→A | ERROR |
+
+```typescript
+// 违反 Shared → Feature 规则
+// src/shared/components/DataTable.tsx
+import { User } from '@features/user/types';  // ERROR: 共享组件依赖了 feature 模块
+
+// 正确做法：将共享类型提取到 shared 层
+import { User } from '@shared/types/user';
+```
+
+#### 7.4.5 路径别名使用
+- 必须使用 `tsconfig.json` 中已配置的路径别名（由 Scanner 在 `docs/.scanner-report.json` 中记录）
+- 禁止使用超过 2 层的相对路径（`../../`）
+- 新增路径别名需要更新 `tsconfig.json` 并触发 Scanner 重新扫描
+
+```typescript
+// 正确：使用已注册的路径别名
+import { Button } from '@shared/components/Button';
+import { formatDate } from '@shared/utils/date';
+
+// 错误：深层相对路径
+import { Button } from '../../../shared/components/Button';
+```
+
+### 7.5 模块公共 API 管理
+
+#### 7.5.1 桶导出规范
+- 每个模块通过 `index.ts` 控制公共 API 面
+- `index.ts` **仅包含 re-export 语句**，不得包含运行时逻辑
+- 内部实现细节（未在 index.ts 中 re-export 的符号）不得被外部模块引用
+
+```typescript
+// src/features/auth/index.ts — 公共 API
+export { AuthService } from './services/auth-service.js';
+export { useAuth } from './hooks/use-auth.js';
+export type { User, LoginInput } from './types.js';
+// 注意：auth-utils.ts 未导出 → 模块私有，外部不得引用
+```
+
+#### 7.5.2 跨模块引用检查
+- 引用其他模块时，只能通过其 `index.ts` 桶文件
+- 禁止深路径导入其他模块的内部文件
+
+```typescript
+// 正确：通过桶文件
+import { AuthService } from '@features/auth';
+
+// 错误：深路径导入其他模块内部
+import { hashPassword } from '@features/auth/utils/internal-crypto';
+```
+
+### 7.6 新增文件时的检查清单
+
+添加新文件前，确认以下事项（参考 `docs/.scanner-report.json`）：
+
+- [ ] 文件放置路径符合检测到的组织模式（§7.4.1）
+- [ ] 若为组件：是否被多模块使用？→ 是则放 `shared/`，否则放模块内（§7.4.2）
+- [ ] 若为工具函数：是否被多模块使用？→ 是则放 `shared/utils/`，否则放模块内（§7.4.3）
+- [ ] 新增的 import 不违反模块依赖规则（§7.4.4）
+- [ ] 使用已注册的路径别名，不使用深层相对路径（§7.4.5）
+- [ ] 模块公共 API 通过桶文件控制（§7.5）
+- [ ] 未引入新的循环依赖
+
 ---
 
 ## 8. 异步编程
