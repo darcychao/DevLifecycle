@@ -1,4 +1,4 @@
-# H5 Lifecycle Framework
+# Development Lifecycle Framework
 
 AI 智能体驱动的软件开发生命周期框架。通过标准化的 7 阶段流程编排 SE、Dev、Test 三大智能体协同工作，内置挑战/纠偏机制、阶段报告体系、需求目录隔离和插件扩展系统。
 
