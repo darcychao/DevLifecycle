@@ -60,6 +60,61 @@ User provides a pre-existing `docs/dev-story.md`. The framework bypasses upstrea
 
 ---
 
+## Requirement Directory Model
+
+Each requirement/feature gets an isolated directory under `docs/requirements/`. All lifecycle artifacts, reports, and challenges for that requirement live within it. Shared project-level docs (architecture, standards, module map) remain at `docs/` root.
+
+### Directory Layout
+```
+docs/
+├── architecture.md                   # Shared — project-wide
+├── module-map.md                     # Shared — project-wide
+├── coding-standards.md               # Shared — project-wide
+├── project-structure.md              # Shared — project-wide
+├── challenges/
+│   └── index.md                      # Shared — global challenge index
+└── requirements/
+    ├── index.md                      # Requirement registry
+    └── REQ-YYYY-NNN-{slug}/
+        ├── prd.md                    # Phase 1 artifact
+        ├── se-design.md              # Phase 2 artifact
+        ├── dev-story.md              # Phase 3 artifact
+        ├── test-plan.md              # Phase 4 artifact
+        ├── reports/
+        │   ├── phase-1-prd-report.md
+        │   ├── phase-2-se-design-report.md
+        │   ├── phase-3-story-design-report.md
+        │   ├── phase-4-test-plan-report.md
+        │   ├── phase-5-dev-coding-report.md
+        │   ├── phase-6-code-review-report.md
+        │   └── phase-7-validation-report.md
+        └── challenges/
+            └── CH-YYYY-NNN.md
+```
+
+### Requirement Index (`docs/requirements/index.md`)
+```markdown
+# Requirement Index
+| REQ ID | Name | Status | Current Phase | Created | Completed |
+|--------|------|--------|---------------|---------|-----------|
+| REQ-2026-001 | user-auth | Phase 5 | 2026-06-06 | - |
+| REQ-2026-002 | payment | Phase 2 | 2026-06-06 | - |
+```
+Status values: `ACTIVE`, `COMPLETED`, `ABANDONED`, `ON-HOLD`.
+
+### Requirement Lifecycle
+1. **Creation:** When a new PRD is provided (Entry A) or a Dev Story is provided (Entry B), the orchestrator assigns a REQ-ID and creates the requirement directory
+2. **Execution:** All phases for this requirement write into its directory
+3. **Completion:** When Phase 7 passes, the requirement is marked COMPLETED in the index
+4. **Parallel requirements:** Multiple requirements can be ACTIVE simultaneously; each has its own directory and independent phase state
+
+### REQ-ID Assignment
+- Format: `REQ-YYYY-NNN` (year + 3-digit sequential counter)
+- Counter resets per year, padded to 3 digits (001, 002, ...)
+- Slug is derived from the PRD title or Dev Story name, lowercased with hyphens
+
+---
+
 ## Phase 0: Initialization Protocol
 
 ### Enforcement Rules
@@ -184,15 +239,20 @@ User provides dev-story.md
 ```
 
 ### Phase Details
-| Phase | Agent | Input | Output | Template | Reviewer |
-|-------|-------|-------|--------|----------|----------|
-| 1. PRD | User | Business needs | `docs/prd.md` | `framework/artifacts/prd.template.md` | — |
-| 2. SE Design | SE Agent | PRD, architecture docs | `docs/se-design.md` | `framework/artifacts/se-design.template.md` | Dev Agent |
-| 3. Story Design | Dev Agent | SE Design, PRD | `docs/dev-story.md` | `framework/artifacts/dev-story.template.md` | SE Agent |
-| 4. Test Plan | Test Agent | PRD, SE Design, Dev Story | `docs/test-plan.md` | `framework/artifacts/test-plan.template.md` | Dev Agent + User |
-| 5. Dev Coding | Dev Agent | Dev Story, Test Plan | Source code | Language-specific standards | SE Agent (Phase 6) |
-| 6. Code Review | SE Agent | Source code, Dev Story, PRD, Test Plan | Review Report | §Code Review Checklist | — (gate to Phase 7) |
-| 7. Validation | Test Agent | Source code, Test Plan, Review Report | `docs/validation-report.md` | `framework/standards/validation-standards.template.md` | — |
+
+All paths are relative to the requirement directory `docs/requirements/REQ-YYYY-NNN-{slug}/`.
+
+| Phase | Agent | Input | Artifact | Report | Template | Reviewer |
+|-------|-------|-------|----------|--------|----------|----------|
+| 1. PRD | User | Business needs | `prd.md` | `reports/phase-1-prd-report.md` | `framework/artifacts/prd.template.md` | — |
+| 2. SE Design | SE Agent | PRD, architecture docs | `se-design.md` | `reports/phase-2-se-design-report.md` | `framework/artifacts/se-design.template.md` | Dev Agent |
+| 3. Story Design | Dev Agent | SE Design, PRD | `dev-story.md` | `reports/phase-3-story-design-report.md` | `framework/artifacts/dev-story.template.md` | SE Agent |
+| 4. Test Plan | Test Agent | PRD, SE Design, Dev Story | `test-plan.md` | `reports/phase-4-test-plan-report.md` | `framework/artifacts/test-plan.template.md` | Dev Agent + User |
+| 5. Dev Coding | Dev Agent | Dev Story, Test Plan | Source code | `reports/phase-5-dev-coding-report.md` | Language-specific standards | SE Agent (Phase 6) |
+| 6. Code Review | SE Agent | Source code, Dev Story, PRD, Test Plan | Review Report | `reports/phase-6-code-review-report.md` | §Code Review Checklist | — (gate to Phase 7) |
+| 7. Validation | Test Agent | Source code, Test Plan, Review Report | `validation-report.md` | `reports/phase-7-validation-report.md` | `framework/standards/validation-standards.template.md` | — |
+
+Each phase produces TWO output files within the requirement directory: the primary artifact and a phase completion report.
 
 ### Phase Transition Rules
 1. Before each transition, check plugin hooks and pending challenges
@@ -202,16 +262,115 @@ User provides dev-story.md
 
 ### State Tracking
 **Tier 0 — Init Gate:** `docs/.framework-init.lock` absent = ALL lifecycle requests rejected.
-**Tier 1 — Phase State** (tracked via document presence in `docs/`):
-| Document | Indicates |
-|----------|-----------|
-| `prd.md` | Phase 1 complete |
-| `se-design.md` | Phase 2 complete |
-| `dev-story.md` | Phase 3 complete (or shortcut entry) |
-| `test-plan.md` | Phase 4 complete |
-| Git commit with source changes | Phase 5 complete |
-| `code-review-report.md` with APPROVED | Phase 6 complete |
-| `validation-report.md` with all pass | Phase 7 complete |
+
+**Tier 1 — Requirement State:** Tracked per-requirement via `docs/requirements/index.md`. Each REQ row records its current phase and status.
+
+**Tier 2 — Phase State** (tracked via artifact + report within the requirement directory):
+| Artifact | Report | Indicates |
+|----------|--------|-----------|
+| `prd.md` | `reports/phase-1-prd-report.md` | Phase 1 complete |
+| `se-design.md` | `reports/phase-2-se-design-report.md` | Phase 2 complete |
+| `dev-story.md` | `reports/phase-3-story-design-report.md` | Phase 3 complete (or shortcut entry) |
+| `test-plan.md` | `reports/phase-4-test-plan-report.md` | Phase 4 complete |
+| Git commit with source changes | `reports/phase-5-dev-coding-report.md` | Phase 5 complete |
+| `reports/phase-6-code-review-report.md` with APPROVED | — | Phase 6 complete |
+| `validation-report.md` | `reports/phase-7-validation-report.md` | Phase 7 complete |
+
+**Tier 3 — Challenge State:** Tracked via `docs/challenges/index.md` — any OPEN challenge blocks phase transition for its requirement.
+
+### Phase Completion Reports (MANDATORY)
+
+Every phase MUST generate a phase report within the requirement's `reports/` directory. The report documents what happened during execution and serves as the quality gate record for phase transition.
+
+**Report path:** `docs/requirements/REQ-YYYY-NNN-{slug}/reports/phase-{N}-{phase-name}-report.md`
+
+**Report format:**
+```markdown
+# Phase {N} Report: {Phase Name}
+- **Report ID:** PH{N}-YYYY-NNN | **Date:** YYYY-MM-DD HH:MM
+- **Agent:** {Agent Name} | **Status:** COMPLETED | CHALLENGED | FAILED
+
+## Input Artifacts
+| Artifact | Path | Status |
+|----------|------|--------|
+| PRD | docs/prd.md | ✓ Present |
+| ... | ... | ... |
+
+## Execution Summary
+- **Steps executed:** N
+- **Decisions made:** (list key design/implementation decisions)
+- **Deviations:** (any deviations from template or upstream spec, with justification)
+
+## Output Artifacts
+| Artifact | Path | Lines/Size |
+|----------|------|------------|
+| ... | ... | ... |
+
+## Quality Gate
+- [ ] Output conforms to template
+- [ ] All mandatory sections populated
+- [ ] Reviewer (if applicable) has accepted
+- **Gate result:** PASS | FAIL (with reason)
+
+## Plugin Hooks Executed
+- `{phase}-pre`: executed / skipped (no hooks registered)
+- `{phase}-post`: executed / skipped
+
+## Reviewer Sign-off
+- **Reviewer:** {Name} | **Decision:** ACCEPT | CHALLENGE
+- **Challenge ID:** CH-YYYY-NNN (if challenged)
+```
+
+**Report generation rule:** The executing agent generates the report immediately after producing the primary artifact and before handoff. If a phase is re-entered (e.g., after challenge resolution), a new report is generated superseding the previous one.
+
+### Challenge Documentation (MANDATORY)
+
+Every challenge MUST be recorded as a standalone document. Per-requirement challenges live in the requirement's `challenges/` directory. The global index at `docs/challenges/index.md` aggregates all challenges across requirements.
+
+**Challenge path:** `docs/requirements/REQ-YYYY-NNN-{slug}/challenges/CH-YYYY-NNN.md` (sequential counter, padded to 3 digits)
+
+**Challenge record format:**
+```markdown
+# Challenge CH-YYYY-NNN
+- **Filed:** YYYY-MM-DD HH:MM | **Phase:** {N} {Phase Name}
+- **Challenger:** {Agent Name} | **Challenged:** {Agent Name}
+- **Status:** OPEN | RESOLVED | ESCALATED | REJECTED
+- **Resolution Date:** YYYY-MM-DD HH:MM (if resolved)
+
+## Basis
+Specific standard/clause/rule citation (e.g., "CR-3: Standards Compliance — coding-standards.typescript.md §4.2")
+
+## Evidence
+[File path:line — concrete example of the violation]
+
+## Impact
+[What breaks, what risks are introduced, what downstream phases are affected]
+
+## Suggested Fix
+[Specific remediation steps]
+
+## Resolution
+- **Resolved by:** {Agent Name} | **Date:** YYYY-MM-DD HH:MM
+- **Changes made:** [Summary of what changed]
+- **Verification:** [How the fix was verified]
+- **Re-review result:** PASS | FAIL
+```
+
+**Challenge lifecycle:**
+1. Challenger creates the challenge record in the requirement's `challenges/` directory with status OPEN
+2. Challenged agent reviews, implements fix, updates Resolution section → status RESOLVED
+3. Challenger verifies fix → if accepted, close; if rejected, status returns to OPEN with explanation
+4. If deadlocked after 2 rounds → status ESCALATED, user decides
+5. Invalid challenges (no cited basis) → status REJECTED with explanation
+6. On every status change, update both the challenge record AND `docs/challenges/index.md`
+
+**Challenge index:** Maintain `docs/challenges/index.md` as a global table across all requirements:
+```markdown
+# Challenge Index
+| ID | REQ ID | Phase | Filed | Challenger | Challenged | Basis | Status | Resolution Date |
+|----|--------|-------|-------|------------|------------|-------|--------|-----------------|
+| CH-2026-001 | REQ-2026-001 | 6 | 2026-06-06 | SE Agent | Dev Agent | CR-2 | RESOLVED | 2026-06-06 |
+```
 
 ---
 
@@ -297,17 +456,42 @@ Phase 5 → SE Agent reviews → ALL PASS → APPROVED → Phase 7
 
 ```
 H5LifecycleTemplate/
-├── CLAUDE.md                         # Master orchestrator
-├── .claude/settings.json             # Harness settings
+├── CLAUDE.md                              # Master orchestrator
+├── .claude/settings.json                  # Harness settings
 ├── framework/
-│   ├── agents/                       # se-agent, dev-agent, test-agent .skill.md
-│   ├── workflows/                    # standard-lifecycle, challenge-mechanism, plugin-extension .rule.md
-│   ├── artifacts/                    # prd, se-design, dev-story, test-plan, architecture-doc .template.md
-│   └── standards/                    # coding-standards (js/ts/java/python/template), project-structure, validation-standards
-├── plugins/                          # Plugin extensions (example-plugin/)
-└── docs/                             # Generated: .framework-init.lock, architecture.md, module-map.md,
-    │                                 #   coding-standards.md, project-structure.md, prd.md, se-design.md,
-    │                                 #   dev-story.md, test-plan.md, code-review-report.md, modules/
+│   ├── agents/                            # se-agent, dev-agent, test-agent .skill.md
+│   ├── workflows/                         # standard-lifecycle, challenge-mechanism, plugin-extension .rule.md
+│   ├── artifacts/                         # prd, se-design, dev-story, test-plan, architecture-doc .template.md
+│   └── standards/                         # coding-standards (js/ts/java/python/template), project-structure, validation-standards
+├── plugins/                               # Plugin extensions (example-plugin/)
+└── docs/                                  # Generated documentation
+    ├── .framework-init.lock               # Init marker + project metadata (JSON)
+    ├── architecture.md                    # Shared — project architecture (Phase 0)
+    ├── module-map.md                      # Shared — file-to-module map (Phase 0)
+    ├── coding-standards.md                # Shared — language standards (Phase 0)
+    ├── project-structure.md               # Shared — directory conventions (Phase 0)
+    ├── challenges/
+    │   └── index.md                       # Global challenge index (all requirements)
+    ├── modules/                           # Per-module docs (large projects, Phase 0)
+    │   └── MOD-XXX.md
+    └── requirements/                      # Requirement directory root
+        ├── index.md                       # Requirement registry
+        └── REQ-YYYY-NNN-{slug}/           # Isolated requirement directory
+            ├── prd.md                     # Phase 1 artifact
+            ├── se-design.md               # Phase 2 artifact
+            ├── dev-story.md               # Phase 3 artifact
+            ├── test-plan.md               # Phase 4 artifact
+            ├── validation-report.md       # Phase 7 artifact
+            ├── reports/                   # Phase completion reports (this req only)
+            │   ├── phase-1-prd-report.md
+            │   ├── phase-2-se-design-report.md
+            │   ├── phase-3-story-design-report.md
+            │   ├── phase-4-test-plan-report.md
+            │   ├── phase-5-dev-coding-report.md
+            │   ├── phase-6-code-review-report.md
+            │   └── phase-7-validation-report.md
+            └── challenges/                # Challenge records (this req only)
+                └── CH-YYYY-NNN.md
 ```
 
 ---
@@ -321,23 +505,36 @@ H5LifecycleTemplate/
 - Lock + Dev Story → Entry B (Shortcut)
 - Lock + PRD/default → Entry A (Full Lifecycle)
 
-### 2. Load Environment
-Read `docs/architecture.md`, load coding standards, scan `plugins/` for hooks, verify framework rules accessible.
+### 2. Create Requirement Directory
+When starting a new lifecycle (Entry A or B for a new requirement):
+1. Assign the next REQ-ID from `docs/requirements/index.md` (or REQ-YYYY-001 if first)
+2. Derive slug from PRD title or Dev Story name
+3. Create `docs/requirements/REQ-YYYY-NNN-{slug}/` with `reports/`, `challenges/` subdirectories
+4. Register the requirement in `docs/requirements/index.md` with status ACTIVE, current phase = 1
+5. All subsequent phases for this requirement write into this directory
 
-### 3. Pre-Flight Checks
-Resolve pending challenges first. Execute `*-pre` plugin hooks. Validate input artifacts against templates.
+### 3. Load Environment
+Read `docs/architecture.md`, load coding standards, scan `plugins/` for hooks, verify framework rules accessible. Identify the current requirement directory.
 
-### 4. Execute Current Phase
-Load agent skill file → provide inputs/standards/architecture → agent produces output per template → run `*-post` hooks → validate output.
+### 4. Pre-Flight Checks
+Resolve pending challenges for this requirement first. Execute `*-pre` plugin hooks. Validate input artifacts against templates.
 
-### 5. Handoff or Halt
-Reviewer accepts → advance phase. Reviewer challenges → pause, route to challenged agent. Validation fails → return for revision.
+### 5. Execute Current Phase
+Load agent skill file → provide inputs/standards/architecture → agent produces primary artifact in the requirement directory → agent generates phase completion report in `{req-dir}/reports/` → run `*-post` hooks → validate output against template.
 
-### 6. Code Review Gate (before Phase 7)
-Invoke SE Agent in Code Review mode → execute 8-item checklist → APPROVED → Phase 7; CHALLENGED → fix → re-review; twice-failed → escalate.
+**Phase report is MANDATORY.** A phase is not complete until its report is written. If the phase produces no report, the orchestrator MUST NOT advance.
 
-### 7. Completion
-Report: phases completed, files changed/created, test results, review status, validation report location.
+### 6. Handoff or Halt
+Reviewer accepts → advance phase, update `docs/requirements/index.md` current phase. Reviewer challenges → **create challenge record** in `{req-dir}/challenges/CH-YYYY-NNN.md`, update `docs/challenges/index.md`, pause lifecycle, route to challenged agent. Validation fails → return for revision.
+
+### 7. Challenge Resolution
+Challenged agent reads challenge record → implements fix → updates challenge Resolution section → sets status RESOLVED. Challenger verifies and closes or re-opens. Every round is appended to the challenge record. After resolution, the phase that triggered the challenge is re-executed and a new phase report is generated.
+
+### 8. Code Review Gate (before Phase 7)
+Invoke SE Agent in Code Review mode → execute 8-item checklist → APPROVED → Phase 7; CHALLENGED → create challenge record → fix → re-review; twice-failed → escalate.
+
+### 9. Completion
+When Phase 7 passes: mark requirement COMPLETED in `docs/requirements/index.md`. Report: phases completed, files changed/created, test results, review status. All artifacts, reports, and challenges are self-contained in the requirement directory.
 
 ---
 
@@ -351,6 +548,12 @@ Detailed rules in `framework/workflows/challenge-mechanism.rule.md`. Highest pri
 4. Invalid challenges (no cited basis, personal preference) are rejected
 5. Deadlocked challenges escalate to user
 6. Code Review challenges are system-generated — SE Agent issues them automatically on checklist failures
+
+**Challenge documentation (MANDATORY):**
+- Every challenge is recorded in the requirement's `challenges/CH-YYYY-NNN.md` using the format defined in §Challenge Documentation
+- `docs/challenges/index.md` (global) is updated on every challenge state change
+- No phase transition is allowed while an OPEN challenge exists against that requirement
+- Challenge records are permanent artifacts — never deleted, only status-updated
 
 ## Plugin Extension Summary
 
