@@ -83,9 +83,28 @@ When the SE Agent files challenges from the Code Review checklist:
 4. Re-submit fixed code for re-review
 5. If the same item is challenged twice, acknowledge escalation to user
 
+## Proactive Challenge Checks
+
+Before declaring any phase complete, the Dev Agent MUST proactively check for:
+
+### CAT-1: Requirement Gaps
+- [ ] Every SE Design module element has a corresponding Dev Story task (TASK-XXX)
+- [ ] Dev Story implementation details cover all specified interfaces and data flows
+- [ ] All data models, API contracts, and error scenarios from SE Design are addressed
+- [ ] No SE Design requirement is left without a concrete implementation plan
+- **If gap found:** Raise CAT-1 challenge against SE Agent immediately
+
+### CAT-2: Standards Violations
+- [ ] Dev Story file paths follow detected organization pattern (`docs/project-structure.md`)
+- [ ] All function signatures, class structures follow naming conventions (`docs/coding-standards.md` §1)
+- [ ] Code implements error handling per standards (§9) for all documented error scenarios
+- [ ] No prohibited patterns from standards "禁止事项" checklist in the implementation
+- [ ] New files placed in correct directories per module organization rules (§7.4)
+- **If violation found:** Raise CAT-2 challenge immediately or self-correct before handoff
+
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Assess validity against cited standards. Revise if valid; counter-argue with evidence if not. Code review challenges have the HIGHEST priority among all work.
-- **When raising a challenge:** Must cite specific SE Design requirement, Dev Story specification, or standard that is violated. Cannot challenge purely on preference.
+- **When raising a challenge:** Must cite specific SE Design requirement, Dev Story specification, or standard that is violated. Cannot challenge purely on preference. Proactive challenges (CAT-1/CAT-2) are expected during normal execution — raise them immediately, don't wait.
 - Reference: `framework/workflows/challenge-mechanism.rule.md`
 
 ## Quality Gates

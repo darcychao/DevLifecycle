@@ -68,9 +68,27 @@ Quality assurance engineer responsible for test planning, test case design, and 
 - If standards violations found during validation, raise challenge
 - If validation reveals issues the code review missed, flag for process improvement
 
+## Proactive Challenge Checks
+
+Before declaring any phase complete, the Test Agent MUST proactively check for:
+
+### CAT-1: Requirement Gaps
+- [ ] Every PRD functional requirement (or Dev Story task) has at least one acceptance criterion
+- [ ] Every acceptance criterion maps to at least one test case
+- [ ] Every documented error scenario has a corresponding test case
+- [ ] Validation covers all code paths identified in the Code Review Report
+- **If gap found:** Raise CAT-1 challenge against the responsible agent (Dev/SE) immediately
+
+### CAT-2: Standards Violations
+- [ ] Test file naming follows detected conventions (`*.spec.ts` / `*.test.ts`)
+- [ ] Test cases follow Arrange-Act-Assert pattern per standards
+- [ ] Test code follows the same coding standards as production code
+- [ ] Validation report format conforms to `framework/standards/validation-standards.template.md`
+- **If violation found:** Raise CAT-2 challenge immediately with specific citation
+
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Assess validity. Revise test plan if challenge is valid.
-- **When raising a challenge:** Must cite specific standard, PRD requirement, Dev Story task, or acceptance criterion. Test Agent can challenge both SE Agent and Dev Agent. Test Agent can also challenge code that passed review if validation reveals missed issues.
+- **When raising a challenge:** Must cite specific standard, PRD requirement, Dev Story task, or acceptance criterion. Test Agent can challenge both SE Agent and Dev Agent. Test Agent can also challenge code that passed review if validation reveals missed issues. Proactive challenges (CAT-1/CAT-2) are expected during normal execution.
 - Reference: `framework/workflows/challenge-mechanism.rule.md`
 
 ## Quality Gates

@@ -151,9 +151,27 @@ After Dev Agent fixes and resubmits:
 3. If any item still fails → re-challenge with escalated severity
 4. If same item fails twice → escalate to user with full evidence
 
+## Proactive Challenge Checks
+
+Before declaring any phase complete, the SE Agent MUST proactively check for:
+
+### CAT-1: Requirement Gaps
+- [ ] Every PRD functional requirement (FR-XXX) has a corresponding design element in SE Design
+- [ ] No PRD requirement is left without a technical implementation plan
+- [ ] Dev Story task list covers all SE Design modules and integration points
+- [ ] Code diff covers every task in the Dev Story
+- **If gap found:** Raise CAT-1 challenge immediately with specific FR/AC citation
+
+### CAT-2: Standards Violations
+- [ ] SE Design module structure follows `docs/project-structure.md` and detected conventions (§0)
+- [ ] All interface definitions follow naming conventions (`docs/coding-standards.md` §1)
+- [ ] Code under review follows all 15 chapters of language-specific standards
+- [ ] No prohibited patterns from standards "禁止事项" checklist
+- **If violation found:** Raise CAT-2 challenge immediately with specific standards citation + file:line
+
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Analyze the challenge, determine if valid. If valid, revise and re-output. If invalid, provide counter-argument with evidence.
-- **When raising a challenge:** Must cite specific standard/clause from `framework/standards/` or specific SE Design requirement. Cannot challenge without documented basis.
+- **When raising a challenge:** Must cite specific standard/clause from `framework/standards/` or specific SE Design/PRD requirement. Cannot challenge without documented basis. Proactive challenges (CAT-1/CAT-2) are expected during normal execution.
 - **Code review challenges:** Are raised automatically on checklist failure. They follow the same formal challenge rules but are system-generated rather than agent-discretionary.
 - Reference: `framework/workflows/challenge-mechanism.rule.md`
 
