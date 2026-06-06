@@ -84,6 +84,23 @@ Phase 1       Phase 2      Phase 3       Phase 4      Phase 5      Phase 6      
 - **Reviewer:** SE Agent (in Phase 6 Code Review)
 - **Gate:** Dev Agent self-validates: tests pass, code compiles, standards check passes
 
+### Phase 5.5: Catalog Compliance Self-Check (目录合规自检)
+
+**Mandatory gate between Dev Coding (Phase 5) and Phase 5 Report generation.**
+
+Before generating the Phase 5 Report, the Dev Agent MUST execute the following self-check:
+
+1. **List new exported methods:** All exported functions/classes/types created or modified in this phase
+2. **Check method catalog:** Verify each new exported method against `docs/public-method-catalog.md` Method-to-Module Index — no duplicate exists
+3. **List new constants:** All constants/enums/as-const objects created or modified in this phase
+4. **Check constant catalog:** Verify each new constant against `docs/constant-catalog.md` Constant-to-Module Index — no duplicate; shared constants (used by 2+ modules) are registered in the Shared Constants table
+5. **Check terminology:** Verify each new type/interface/function name against `docs/terminology-glossary.md` Term Index — naming is consistent with existing domain terminology
+6. **Write symbol declaration:** The above checklist results MUST be written into the Phase 5 Report under a "New Symbol Declaration" (新增符号声明) section
+
+**Gate rule:** If any check FAILS → self-correct → re-run self-check → ALL PASS before Phase 5 Report generation.
+
+**Challenge rule:** If the self-check discovers a catalog conflict (duplicate method, unregistered constant, terminology clash), the Dev Agent MUST file a **self-challenge** (CAT-2a/2b/2c) with a CH-YYYY-NNN record in the requirement's `challenges/` directory. The self-challenge must be RESOLVED before the Phase 5 Report can be generated.
+
 ### Phase 6: Code Review (代码审核)
 - **Agent:** SE Agent (`framework/agents/se-agent.skill.md`) — acting as Code Reviewer
 - **Input:** Source code changes, `docs/dev-story.md`, `docs/prd.md` (or Dev Story if shortcut), `docs/test-plan.md`, language-specific coding standards, `docs/architecture.md`
@@ -133,6 +150,25 @@ SE Agent performs Code Review (8-item checklist)
 - Each failed checklist item generates a separate formal challenge entry in the review report
 - Challenges follow all rules in `framework/workflows/challenge-mechanism.rule.md`
 
+### Phase 6.5: Catalog Consistency Verification (目录一致性核查)
+
+**Mandatory gate between Code Review (Phase 6) APPROVAL and Phase 7 (Validation).**
+
+After the 8-item Code Review checklist passes (status: APPROVED), the SE Agent MUST perform an additional catalog consistency check before the orchestrator advances to Phase 7:
+
+1. **Method declaration check:** Compare the "New Symbol Declaration" section in the Phase 5 Report against the actual code diff. Every new exported method in the code MUST be listed in the declaration. Every declared method MUST exist in the code diff.
+2. **Constant declaration check:** Compare the "New Symbol Declaration" section in the Phase 5 Report against the actual code diff. Every new constant in the code MUST be listed in the declaration. Every declared constant MUST exist in the code diff.
+3. **Cross-catalog verification:** Verify that the new symbols in the code diff are consistent with all three catalog documents:
+   - `docs/public-method-catalog.md` — no undeclared new methods
+   - `docs/constant-catalog.md` — no unregistered shared constants
+   - `docs/terminology-glossary.md` — no terminology inconsistency
+
+**Gate rule:** Any inconsistency → **immediately raise a CAT-2 challenge** (CAT-2a for method issues, CAT-2b for constant issues, CAT-2c for terminology issues) → challenge record created → Phase 7 is BLOCKED until the challenge is RESOLVED.
+
+**Challenge record requirement:** Each Phase 6.5 violation generates a separate CH-YYYY-NNN record citing the specific catalog document, the symbol in question, and the nature of the inconsistency.
+
+**Re-verification:** After Dev Agent resolves the challenge, the SE Agent re-executes Phase 6.5 only (not the full 8-item checklist, unless the fix introduced new code changes requiring re-review).
+
 ### Phase 7: Process Validation
 - **Agent:** Test Agent (via plugin invocation)
 - **Input:** Source code, `docs/test-plan.md`, `docs/code-review-report.md`
@@ -145,10 +181,12 @@ SE Agent performs Code Review (8-item checklist)
 1. **Before each phase transition**, check `framework/workflows/plugin-extension.rule.md` for plugin hooks
 2. **Before each phase transition**, check `framework/workflows/challenge-mechanism.rule.md` for pending challenges
 3. **A phase is complete** only when its quality gate is satisfied AND its reviewer has accepted the output
-4. **Phase 6 is a hard gate** — Phase 7 is unreachable without an APPROVED code review report
-5. **Full lifecycle: no phase skipping** — each phase must complete in order
-6. **Shortcut path: defined entry point** — enter at Phase 4 or Phase 5 with user-provided Dev Story
-7. **Phase re-entry** — a challenge may force re-entry to a prior phase
+4. **Phase 5.5 is a hard gate** — Phase 5 Report cannot be generated until catalog compliance self-check passes
+5. **Phase 6 is a hard gate** — Phase 7 is unreachable without an APPROVED code review report
+6. **Phase 6.5 is a hard gate** — Phase 7 is unreachable if catalog consistency verification raises unresolved challenges
+7. **Full lifecycle: no phase skipping** — each phase (including sub-phases) must complete in order
+8. **Shortcut path: defined entry point** — enter at Phase 4 or Phase 5 with user-provided Dev Story
+9. **Phase re-entry** — a challenge may force re-entry to a prior phase
 
 ## State Tracking
 

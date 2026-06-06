@@ -167,6 +167,151 @@ Identify config, middleware, and other infrastructure shared across modules:
 
 ---
 
+#### B.4 Public Method Inventory
+
+This phase catalogs ALL exported public methods across the project, not just shared ones (B.2). Unlike B.2 which filters to "imported by 2+ modules", this is a comprehensive inventory for downstream reuse checks.
+
+**Detection algorithm:**
+1. Scan all files classified as `service`, `utility`, `controller`, `middleware`, `repository`, or `entry`
+2. For each file, extract all exported function/method declarations:
+   - `export function name(...)` — named function export
+   - `export const name = (...) =>` — arrow function assigned to exported const
+   - `export async function name(...)` — async function export
+   - `export default function name(...)` — default function export
+   - Class methods with `public` modifier (TypeScript)
+3. For each exported method, record:
+   - Name (the exported symbol name)
+   - Full signature (parameters with types, return type)
+   - Classification (derived from verb prefix — see table below)
+   - Defining module (resolved via Phase C module grouping)
+   - Source file and line number
+   - Async/sync indicator
+4. Determine consumers:
+   - Scan all import statements across the codebase (using Phase D import graph data)
+   - Record each consumer file path and its parent module ID
+   - If imported by 2+ modules → `is_shared: true`
+   - If imported by 0 files → `is_dead_code: true`
+5. Flag methods with zero consumers as "Dead Code Candidates"
+
+**Classification rules** (applied per-method, based on verb prefix):
+| Verb Pattern | Classification |
+|-------------|----------------|
+| `fetch*`, `send*`, `request*`, `upload*`, `download*`, `api*` | API Communication |
+| `create*`, `update*`, `delete*`, `save*`, `insert*`, `remove*` | CRUD Operations |
+| `validate*`, `sanitize*`, `check*`, `assert*`, `verify*` | Validation |
+| `format*`, `parse*`, `transform*`, `convert*`, `serialize*` | Data Transformation |
+| `init*`, `setup*`, `bootstrap*`, `start*`, `stop*`, `destroy*` | Lifecycle Management |
+| `subscribe*`, `emit*`, `dispatch*`, `notify*`, `publish*`, `handle*` | Event Handling |
+| `calculate*`, `compute*`, `aggregate*`, `sum*`, `average*` | Computation |
+| `render*`, `display*`, `show*`, `draw*`, `mount*` | UI Rendering |
+| `get*`, `find*`, `query*`, `list*`, `search*`, `lookup*` | Data Retrieval |
+| All others | Other |
+
+**Output structure** feeds into `docs/public-method-catalog.md` and `.scanner-report.json` → `public_methods`.
+
+---
+
+#### B.5 Constant Inventory
+
+This phase catalogs ALL constants, enums, and as-const objects across the project for downstream reuse checks and unified naming enforcement.
+
+**Detection algorithm:**
+1. Scan all source files (excluding test files) for:
+   - Top-level `const` declarations (module-scope and namespace-scope)
+   - `enum` declarations (numeric and string enums)
+   - `as const` object declarations
+   - `readonly` array/tuple declarations
+2. For each constant, record:
+   - Name (fully qualified: `EnumName.MemberName` for enum members)
+   - Kind (`const`, `enum`, `enum-member`, or `as-const`)
+   - Value (literal value for primitives; type description for complex; member count for enums)
+   - Location (file:line)
+   - Defining module (resolved via Phase C)
+   - Category (inferred from naming and location — see table below)
+   - Naming case (`UPPER_SNAKE_CASE`, `PascalCase`, `camelCase`, `mixed`)
+   - Export status (named export, default export, or not exported)
+   - String prefix pattern (for string constants: extract the prefix before the first underscore)
+3. Determine consumers:
+   - Scan all import statements across the codebase (using Phase D import graph data)
+   - Record each consumer file path and parent module ID
+   - If imported by 2+ modules → `is_shared: true`
+4. Count inline literals in business logic files (non-config, non-constant files):
+   - Calculate percentage of statements that are inline literals
+   - Flag files where >5% of statements are inline literals → Magic Value Report
+
+**Category inference:**
+| Condition | Category |
+|-----------|----------|
+| Name starts with `API_`, `ENDPOINT_`, `ROUTE_`, `URL_`, `PATH_` | API path |
+| Name starts with `ERR_`, `ERROR_`, `ERRCODE_` | Error code |
+| Name starts with `CFG_`, `CONFIG_`, `SETTING_`, `OPTION_` | Config key |
+| `enum` keyword or `as const` with string members and noun name | Enum |
+| Name starts with `MSG_`, `MESSAGE_` | Message template |
+| Name starts with `FEATURE_`, `FLAG_`, `TOGGLE_` or boolean const | Feature flag |
+| Name starts with `REGEX_`, `PATTERN_`, `RE_` | Regex pattern |
+| Name starts with `DEFAULT_`, `FALLBACK_` | Default value |
+| Numeric literal, no descriptive prefix or unit context | Magic number |
+| Fallback | Other |
+
+**Output structure** feeds into `docs/constant-catalog.md` and `.scanner-report.json` → `constants`.
+
+---
+
+#### B.6 Terminology Extraction
+
+This phase extracts domain terminology from the codebase and builds a glossary with cross-references to modules, methods, and constants.
+
+**Detection algorithm:**
+
+**Step 1 — Extract terms from type/interface/class/enum names (strongest signal):**
+Extract all exported type, interface, class, and enum names. Split PascalCase names into constituent words. These are domain nouns.
+- `UserProfile` → `User`, `Profile`
+- `OrderRepository` → `Order` (filter `Repository` as generic)
+- `PaymentStatus` → `Payment`, `Status`
+
+**Step 2 — Extract terms from function/method names:**
+From the B.4 inventory, extract noun components by removing known verb prefixes.
+- `createUser` → verb `create`, noun `User`
+- `validateEmailAddress` → verb `validate`, noun `EmailAddress` → split to `Email`, `Address`
+
+**Step 3 — Extract terms from directory names:**
+Module directory basenames (after removing `src/`, `features/`, `shared/`).
+- `src/features/auth/` → `auth`
+- `src/shared/components/` → filter as too generic
+
+**Step 4 — Filter and normalize:**
+- Convert all to lowercase for the term index
+- Remove English stop words (same list as keyword extraction)
+- Remove generic programming terms: `service`, `controller`, `handler`, `repository`, `middleware`, `util`, `helper`, `manager`, `provider`, `factory`, `builder`, `adapter`, `wrapper`, `proxy`, `decorator`, `plugin`, `module`, `component`, `interface`, `type`, `class`, `function`, `method`, `data`, `input`, `output`, `result`, `response`, `request`, `error`, `event`, `callback`, `config`, `option`, `setting`, `param`, `context`
+
+**Step 5 — Derive definitions:**
+For each term, analyze symbols containing that term:
+- If mapped to an `interface`/`type` → extract property names to understand the shape
+  - `User { id, name, email, role }` → "A user entity with identity, contact, and role attributes"
+- If appearing in function names with consistent verb patterns → derive purpose
+  - `createUser`, `getUserById`, `deleteUser` → "A user entity supporting CRUD operations"
+- If mapped to an `enum` → values inform the definition
+  - `OrderStatus { Pending, Processing, Completed }` → "The lifecycle states of an order"
+- Fallback: "Domain entity: {term}" if insufficient context
+
+**Step 6 — Build relationships:**
+- **Term → Related modules:** All modules where the term appears (in symbol names, directory names, or file names)
+- **Term → Related terms:** Terms co-occurring with this term in the same module's keyword list or in compound symbol names across 2+ modules
+- **Term → Related methods:** From B.4 inventory, methods whose names contain this term
+- **Term → Related constants:** From B.5 inventory, constants whose names contain this term
+
+**Step 7 — Build domain clusters:**
+- Create a co-occurrence matrix: term A and term B co-occur if found in the same module OR in the same compound symbol name
+- Group using connected-components: two terms are in the same cluster if they co-occur in >=2 modules, or appear together in >=3 compound symbol names
+- Label each cluster with the most frequent capability label from the module where cluster terms are most concentrated
+
+**Step 8 — Flag undefined terms:**
+Terms found in only one symbol or one file with no structural context → list in "Terms with No Definition" section.
+
+**Output structure** feeds into `docs/terminology-glossary.md` and `.scanner-report.json` → `terminology`.
+
+---
+
 ### Phase C: Module Boundary Identification
 
 Group every classified source file into a module. A file belongs to exactly ONE module.
@@ -483,6 +628,73 @@ Machine-readable JSON for downstream agent consumption:
     "circular": 0,
     "violations": []
   },
+  "public_methods": {
+    "total": 87,
+    "by_classification": { "API": 12, "CRUD": 23, "VAL": 8, "QUERY": 18, "XFMR": 10, "LIFE": 5, "EVENT": 6, "COMP": 3, "UI": 0, "OTHER": 2 },
+    "methods": [
+      {
+        "name": "createUser",
+        "signature": "async (input: CreateUserInput): Promise<User>",
+        "classification": "CRUD",
+        "provider_module": "MOD-004",
+        "provider_file": "src/features/user/services/user-service.ts",
+        "line": 42,
+        "is_async": true,
+        "consumers": [
+          { "module_id": "MOD-001", "files": ["src/index.ts"] },
+          { "module_id": "MOD-006", "files": ["src/features/admin/user-admin.ts"] }
+        ],
+        "is_shared": true,
+        "is_dead_code": false
+      }
+    ]
+  },
+  "constants": {
+    "total": 134,
+    "by_kind": { "const": 78, "enum": 8, "enum-member": 40, "as-const": 8 },
+    "by_category": { "API": 15, "ERR": 22, "CFG": 30, "ENUM": 48, "MSG": 6, "FLAG": 5, "REGEX": 3, "DEFAULT": 4, "MAGIC": 8, "OTHER": 6 },
+    "constants": [
+      {
+        "name": "API_BASE_URL",
+        "kind": "const",
+        "value": "'https://api.example.com'",
+        "location": "src/shared/constants/api.ts:3",
+        "defining_module": "MOD-008",
+        "category": "API",
+        "naming_case": "UPPER_SNAKE_CASE",
+        "is_exported": true,
+        "string_prefix": "API_",
+        "consumers": [
+          { "module_id": "MOD-004", "files": ["src/features/auth/login.ts"] },
+          { "module_id": "MOD-005", "files": ["src/features/dashboard/api.ts"] }
+        ],
+        "is_shared": true
+      }
+    ],
+    "magic_value_files": [
+      { "file": "src/utils/validation.ts", "inline_literals": 12, "statement_pct": 8.2 }
+    ]
+  },
+  "terminology": {
+    "total_terms": 45,
+    "domain_clusters": [
+      {
+        "label": "Authentication & Session Management",
+        "terms": ["auth", "login", "token", "session", "credential"],
+        "primary_module": "MOD-003"
+      }
+    ],
+    "terms": [
+      {
+        "term": "user",
+        "definition": "A user entity with identity (id, email), role assignment, and associated CRUD operations",
+        "found_in_modules": ["MOD-001", "MOD-003", "MOD-004", "MOD-006"],
+        "related_terms": ["auth", "profile", "role", "permission", "session"],
+        "related_methods": ["createUser", "getUserById", "updateUser", "deleteUser", "validateUser"],
+        "related_constants": ["USER_ROLES", "DEFAULT_USER_ROLE", "ERR_USER_NOT_FOUND"]
+      }
+    ]
+  },
   "keyword_index": {
     "auth": [{ "module_id": "MOD-003", "module_name": "Auth", "capability": "Authentication & Session Management" }],
     "login": [{ "module_id": "MOD-003", "module_name": "Auth", "capability": "Authentication & Session Management" }],
@@ -497,7 +709,45 @@ Machine-readable JSON for downstream agent consumption:
 }
 ```
 
-#### E.3 Architecture Document Contributions
+#### E.3 Public Method Catalog (`docs/public-method-catalog.md`)
+
+Generate the comprehensive public method catalog following `framework/artifacts/public-method-catalog.template.md`. Populate from the B.4 Public Method Inventory data.
+
+Quality checks:
+- Every exported method from B.4 appears in the catalog (Section 1 Method-to-Module Index)
+- Classification is assigned to every method (fallback: `OTHER`)
+- Consumer module lists are complete (all import references from Phase D resolved)
+- Section 4 (Unused Exports) is populated from B.4 zero-consumer flags
+- Section 1 (Method-to-Module) and Section 2 (Module-to-Methods) are internally consistent
+- All consumer module IDs are valid (exist in `docs/module-map.md`)
+
+#### E.4 Constant Catalog (`docs/constant-catalog.md`)
+
+Generate the comprehensive constant catalog following `framework/artifacts/constant-catalog.template.md`. Populate from the B.5 Constant Inventory data.
+
+Quality checks:
+- Every constant from B.5 appears in the catalog (Section 1 Constant-to-Module Index)
+- Category is assigned to every constant (fallback: `OTHER`)
+- Section 3 (Shared Constants) lists all constants with 2+ consumer modules
+- Section 4 (Magic Value Report) lists files exceeding 5% inline-literal threshold
+- Section 5 (Constant Naming Summary) statistics are accurate
+- Section 1 and Section 2 are internally consistent
+- All consumer file paths are valid (exist in `docs/module-map.md` cross-reference)
+
+#### E.5 Terminology Glossary (`docs/terminology-glossary.md`)
+
+Generate the auto-derived terminology glossary following `framework/artifacts/terminology-glossary.template.md`. Populate from the B.6 Terminology Extraction data.
+
+Quality checks:
+- Every term from B.6 appears in the glossary (minimum 10 terms for non-empty projects, no cap for large)
+- Every term has at least a fallback definition ("Domain entity: {term}")
+- Section 2 (Term-to-Module) cross-references are complete
+- Section 3 (Domain Cluster Map) has 1+ clusters for projects with >=3 modules
+- Section 4 (Terms with No Definition) explicitly lists underdefined terms
+- Related method and constant references in Section 2 are valid (exist in public-method-catalog.md and constant-catalog.md)
+- All module IDs in "Related Modules" are valid (exist in `docs/module-map.md`)
+
+#### E.6 Architecture Document Contributions
 The scanner provides data for these sections of `docs/architecture.md`:
 - **§2 Module Architecture** — full module inventory with types, keywords, and functional capabilities
 - **§3 Module Dependency Graph** — ASCII diagram + dependency matrix (enhanced with functional dependency annotations)

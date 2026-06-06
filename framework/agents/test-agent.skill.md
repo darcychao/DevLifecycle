@@ -19,6 +19,9 @@ Quality assurance engineer responsible for test planning, test case design, and 
 - `docs/architecture.md` — project architecture for integration test scope
 - `docs/module-map.md` — module dependency graph for integration test design; keyword index for locating test targets
 - `docs/.scanner-report.json` — (optional) machine-readable scan data
+- `docs/public-method-catalog.md` — method inventory for test coverage scoping
+- `docs/constant-catalog.md` — constants inventory for magic-value cleanup verification
+- `docs/terminology-glossary.md` — terminology for test case naming consistency
 - `docs/code-review-report.md` — must be APPROVED before validation
 - `docs/coding-standards.md` §0 — **project-level coding standard (highest priority)**
 - `framework/standards/validation-standards.template.md`
@@ -34,6 +37,8 @@ Quality assurance engineer responsible for test planning, test case design, and 
 - **Full lifecycle path:** Extract all testable requirements from PRD
 - **Shortcut path:** Extract testable requirements from Dev Story tasks and implementation details
 - **Integration test scoping:** Consult `docs/module-map.md` dependency graph to identify module interaction boundaries that need integration testing. Use the keyword index to find modules related to the feature under test.
+- **Test coverage scoping:** Consult `docs/public-method-catalog.md` to identify all exported methods that need test coverage. Flag any exported method without a corresponding test case.
+- **Magic value verification:** Consult `docs/constant-catalog.md` Magic Value Report to identify files needing constant extraction. Add regression tests for extracted constants.
 - Identify edge cases, boundary conditions, error paths
 - Note any non-functional requirements (performance, security, etc.)
 
@@ -65,6 +70,11 @@ Quality assurance engineer responsible for test planning, test case design, and 
 - Plugin provides standardized input → output validation
 - Compare actual output against expected results
 - Cross-reference validation results with code review findings (if any issues were found and fixed, verify the fixes)
+- **Catalog cross-verification:**
+  1. Verify that all new exported methods in the code diff appear in `docs/public-method-catalog.md` Method-to-Module Index. If any new method is missing from the catalog → raise CAT-2a challenge against Dev Agent.
+  2. Verify that all new shared constants in the code diff appear in `docs/constant-catalog.md` Shared Constants table. If any shared constant is unregistered → raise CAT-2b challenge against Dev Agent.
+  3. Verify that new type/interface/function names are consistent with `docs/terminology-glossary.md` Term Index. If any naming conflict exists → raise CAT-2c challenge against Dev Agent (or SE Agent if the name originated from design).
+  4. Cross-check the Phase 5 Report "New Symbol Declaration" section against the actual code diff — any undeclared symbol is a CAT-2 violation and blocks Phase 7.
 
 ### Step 7: Report Results
 - Document pass/fail for each test case and validation case
@@ -90,7 +100,11 @@ Before declaring any phase complete, the Test Agent MUST proactively check for:
 - [ ] Test code follows the same coding standards as production code (project-level §0 first, then language-specific)
 - [ ] Validation report format conforms to `framework/standards/validation-standards.template.md`
 - [ ] Integration tests cover documented module dependency edges from `docs/module-map.md`
-- **If violation found:** Raise CAT-2 challenge immediately with specific citation (§0.X or §N)
+- [ ] Test case names use terminology consistent with `docs/terminology-glossary.md` (MUST-09, MUST-10)
+- [ ] **CAT-2a check:** All exported methods in `docs/public-method-catalog.md` have corresponding test cases. If test coverage gap found → raise CAT-2a challenge against Dev Agent.
+- [ ] **CAT-2b check:** Constants extracted from Magic Value Report have regression tests. If regression test missing for an extracted constant → raise CAT-2b challenge against Dev Agent.
+- [ ] **CAT-2c check:** New type/interface/function names in the code under test use terminology consistent with `docs/terminology-glossary.md` (MUST-09, MUST-10). If inconsistency found → raise CAT-2c challenge.
+- **If violation found:** Raise CAT-2 challenge immediately with specific citation (§0.X or §N). For catalog-specific violations, use sub-category identifier (CAT-2a/2b/2c) in the challenge record.
 
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Assess validity. Revise test plan if challenge is valid.

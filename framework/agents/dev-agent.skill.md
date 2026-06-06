@@ -19,6 +19,9 @@ Senior software engineer responsible for detailed implementation design, coding,
 - `docs/architecture.md` — project architecture
 - `docs/module-map.md` — module cross-reference with keyword index for quick capability lookup
 - `docs/.scanner-report.json` — (optional) machine-readable scan data for programmatic module lookups
+- `docs/public-method-catalog.md` — exported method inventory for reuse checks before coding (MUST-01)
+- `docs/constant-catalog.md` — constants inventory for reuse checks and registration (MUST-05, MUST-08)
+- `docs/terminology-glossary.md` — domain terminology for consistent naming (MUST-09, MUST-10)
 - `docs/coding-standards.md` §0 — **project-level coding standard (highest priority)**
 - `docs/dev-story.md` (in shortcut path, this is the source of truth)
 - `docs/test-plan.md`
@@ -51,7 +54,12 @@ Senior software engineer responsible for detailed implementation design, coding,
 - Address feedback, revise as needed
 
 ### Step 4: Implement Code
-- **4.0: Locate relevant modules** — Consult the Keyword-to-Module Index in `docs/module-map.md` to find which existing modules provide the capabilities needed by the current task. Identify which modules will need modification and which shared resources (components, methods, infrastructure) are available for reuse.
+- **4.0: Locate relevant modules and check catalogs** —
+  1. Consult the Keyword-to-Module Index in `docs/module-map.md` to find which existing modules provide the capabilities needed.
+  2. **Method reuse check (MUST-01):** Search `docs/public-method-catalog.md` Method-to-Module Index for methods matching the needed functionality. If a method with the required behavior exists, reuse it — do NOT create a duplicate. **If catalog check reveals an existing equivalent method that was about to be duplicated → immediately file a CAT-2a self-challenge with CH-YYYY-NNN record, stop coding, and reuse the existing method instead.**
+  3. **Constant reuse check (MUST-08):** Search `docs/constant-catalog.md` Constant-to-Module Index for constants matching the needed value/configuration. If a constant exists with the same purpose, reuse it — do NOT define a duplicate. **If catalog check reveals an existing equivalent constant that was about to be duplicated → immediately file a CAT-2b self-challenge with CH-YYYY-NNN record, stop coding, and reuse the existing constant instead.**
+  4. **Terminology check (MUST-09):** Search `docs/terminology-glossary.md` Term Index for the domain concepts relevant to the task. Use established terms for new type/interface/function names — do NOT introduce synonyms. **If naming conflicts with an existing glossary term → immediately file a CAT-2c self-challenge with CH-YYYY-NNN record, stop coding, and align naming with the glossary.**
+  5. Identify which modules will need modification and which shared resources (components, methods, infrastructure, constants) are available for reuse.
 - Write code following Dev Story exactly
 - Adhere to project-level coding standard (`docs/coding-standards.md` §0) as primary reference
 - Adhere to language-specific coding standards (where not overridden by §0)
@@ -72,6 +80,8 @@ Before handing off for code review, the Dev Agent MUST self-check against the 8-
 - CR-8: No commented-out code, no empty catch blocks, no dead code
 
 Run the full test suite to confirm no regressions.
+
+**Self-validation escalation rule:** If self-validation discovers any MUST-01~MUST-12 catalog violation (method duplication, constant non-registration, terminology inconsistency, magic values, etc.) → **file a self-challenge immediately** (CAT-2a/2b/2c with CH-YYYY-NNN record) → fix the violation → re-run self-validation → ALL checks must pass before Phase 5 Report can be generated. Self-challenges are treated the same as externally-filed challenges for phase transition blocking purposes.
 
 ### Step 6: Submit for Code Review
 - Announce completion to the orchestrator
@@ -106,6 +116,11 @@ Before declaring any phase complete, the Dev Agent MUST proactively check for:
 - [ ] No prohibited patterns from standards "禁止事项" checklist in the implementation
 - [ ] New files placed in correct directories per module organization rules (§7.4) and §0.4 file organization conventions
 - [ ] New or modified public API symbols have keywords consistent with the module's keyword tags in `docs/module-map.md`
+- [ ] Before creating a new exported function, `docs/public-method-catalog.md` was consulted — no duplicate exists (MUST-01)
+- [ ] Before defining a new constant, `docs/constant-catalog.md` was consulted — no duplicate exists (MUST-08)
+- [ ] New type/interface/function names use terminology consistent with `docs/terminology-glossary.md` (MUST-09)
+- [ ] New shared constants are declared for registration in `docs/constant-catalog.md` (MUST-05)
+- [ ] No new magic values in business logic — constants extracted per MUST-07
 - **If violation found:** Raise CAT-2 challenge immediately or self-correct before handoff
 
 ## Challenge Rules

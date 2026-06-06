@@ -56,6 +56,9 @@ A valid challenge MUST include:
 - `docs/test-plan.md` — any specific test case or acceptance criterion
 - `framework/artifacts/*.template.md` — missing required sections
 - Code Review Checklist — any of the 8 items (CR-1 through CR-8)
+- `docs/public-method-catalog.md` — Method-to-Module Index for proving method duplication or absence
+- `docs/constant-catalog.md` — Constant-to-Module Index for proving constant non-registration or duplication
+- `docs/terminology-glossary.md` — Term Index for proving terminology inconsistency
 
 ### Invalid Challenges
 Challenges are REJECTED if:
@@ -114,6 +117,50 @@ Code Review challenges differ from standard challenges in these ways:
 - If challenges are related, resolve together
 - If challenges conflict (one says X is wrong, other says X is right), escalate to user
 - Code review challenges are bundled in one review report; Dev Agent addresses all together
+
+## Catalog Compliance Challenge Sub-Categories (CAT-2 Extension)
+
+The following sub-categories extend CAT-2 (Standards Violation Challenge) for catalog-driven compliance enforcement. These challenges are triggered when new code introduces symbols that conflict with cataloged project assets.
+
+### CAT-2a: Method Duplication (方法重复)
+- **Trigger condition:** Newly created exported function has equivalent signature and behavior to an existing method in `docs/public-method-catalog.md`
+- **Detection timing:** Phase 5 Self-Validation (Dev Agent self-check), Phase 6 Code Review (SE Agent CR-3), Phase 6.5 Catalog Consistency Verification
+- **Basis:** `docs/coding-standards.md` §0.2.1 MUST-01
+- **Challenged party:** Dev Agent
+- **Resolution:** Delete the duplicate method and use the cataloged method instead; or prove functional non-equivalence with documented evidence
+- **Challenge record must cite:** Method-to-Module Index row showing the existing equivalent method
+
+### CAT-2b: Constant Non-Registration (常量未归档)
+- **Trigger condition:** Newly created constant is referenced by 2+ modules but does not appear in `docs/constant-catalog.md` Shared Constants table
+- **Detection timing:** Phase 5 Self-Validation, Phase 5.5 Catalog Compliance Self-Check, Phase 6 Code Review (SE Agent CR-3), Phase 6.5 Catalog Consistency Verification
+- **Basis:** `docs/coding-standards.md` §0.3.1 MUST-05
+- **Challenged party:** Dev Agent
+- **Resolution:** Register the constant in constant-catalog.md Shared Constants table; or move the constant to the unified constants file
+- **Challenge record must cite:** Shared Constants table showing the constant is absent
+
+### CAT-2c: Terminology Inconsistency (术语不一致)
+- **Trigger condition:** Newly created type/interface/function name conflicts with an existing term definition in `docs/terminology-glossary.md` (e.g., same concept using a different name, or same name used for a different concept)
+- **Detection timing:** Phase 3 Story Design (Dev Agent), Phase 6 Code Review (SE Agent CR-3), Phase 6.5 Catalog Consistency Verification
+- **Basis:** `docs/coding-standards.md` §0.7.1 MUST-09, MUST-10
+- **Challenged party:** Dev Agent or SE Agent
+- **Resolution:** Rename to unify with the glossary-defined term; or register the new term with a clear distinction from the existing term
+- **Challenge record must cite:** Term Index row showing the conflicting existing term
+
+### Catalog Challenge Resolution Flow
+
+```
+CAT-2a/2b/2c raised
+       │
+       ├── Agent accepts → Fix code to match catalog → Re-run self-check → Catalog verified → Phase proceeds
+       │
+       └── Agent rejects (claims non-equivalence) → Submit evidence to challenger → Challenger reviews
+                    │
+                    ├── Evidence accepted → Challenge CLOSED (REJECTED with documentation)
+                    │
+                    └── Evidence rejected → ESCALATED to User for final decision
+```
+
+**Escalation rule:** If the same catalog compliance issue is challenged twice without resolution → immediate escalation. Catalog integrity is critical for long-term project maintainability.
 
 ## Challenge Prevention
 

@@ -31,6 +31,15 @@ Scanner Agent 在 Phase F 对全量代码采样分析（每个模块最多 20 �
 | 错误处理 | `{待扫描填充}` | — | — | — |
 | 参数命名 | `{待扫描填充}` | — | — | — |
 
+#### 0.2.1 公共方法复用检查（强制规则）
+
+⬢ **project-specific** — 以下规则由框架强制要求，不可通过覆盖率检测豁免：
+
+- **MUST-01: 新建方法前检查公共方法目录。** 在创建任何新的导出函数/方法之前，MUST 查阅 `docs/public-method-catalog.md` 的 Method-to-Module Index，确认项目中是否已存在功能等效的公共方法。若存在，MUST 复用而非重复创建。
+- **MUST-02: 新建方法后目录同步。** 每次新建导出函数/方法后，MUST 确保其出现在项目公共方法目录中。Phase 0 初始化时 Scanner Agent 生成基线目录；后续新增方法由 Dev Agent 在 Phase 5 Report 中声明新增方法清单，由 SE Agent 在 Phase 6 Code Review 时核查目录一致性。
+- **MUST-03: 死代码清理。** 公共方法目录中标记为 "Unused Exports (Dead Code Candidates)" 的方法 MUST 在每次 Phase 0 重新扫描时被审查。若连续两次扫描均为零引用，标记为待删除。
+- **MUST-04: 分类正确性。** 新建方法 MUST 按照公共方法目录中定义的同模块方法的分类模式进行分类。若模块中 80% 的方法被分类为同一类别（如 "CRUD"），新建方法不可使用不兼容的分类（如 "Event Handling"），除非该方法确实属于不同职责领域（此时在 Dev Story 中说明原因）。
+
 ### 0.3 常量定义约定
 | 约定项 | 检测结果 | 覆盖率 | 标记 | 偏离文件 |
 |--------|---------|--------|------|-----------|
@@ -49,6 +58,15 @@ Scanner Agent 在 Phase F 对全量代码采样分析（每个模块最多 20 �
 - 跨模块共享常量 MUST 放在检测到的共享常量目录
 - 字符串常量 MUST 遵循检测到的前缀约定
 - 魔法值超过检测到的容忍度阈值 → 提取为命名常量
+
+#### 0.3.1 常量目录注册规则（强制规则）
+
+⬢ **project-specific** — 以下规则由框架强制要求：
+
+- **MUST-05: 新共享常量必须注册。** 任何被 2+ 模块引用的新建常量 MUST 出现在 `docs/constant-catalog.md` 的 Shared Constants 表中。Dev Agent 在 Phase 5 Report 中声明新增常量清单；SE Agent 在 Phase 6 Code Review 时核查常量目录一致性。
+- **MUST-06: 统一命名与集中存储。** 新建常量 MUST 遵循 `docs/constant-catalog.md` 中检测到的命名规范（通过 Category 和 Naming Case 列识别）。相同 Category 的常量 MUST 集中在同一文件中，禁止散落各处。示例：API 路径常量（`API_*`）全部在 `src/shared/constants/api.ts`，错误码常量（`ERR_*`）全部在 `src/shared/constants/errors.ts`。
+- **MUST-07: 魔法值禁止。** `docs/constant-catalog.md` 的 Magic Value Report 中列出的文件 MUST 在每次 Phase 0 重新扫描前完成整改。新建代码中禁止在业务逻辑中使用内联字面量（数字、字符串），必须提取为命名常量。豁免项：数学公式中的 0、1、-1；数组索引；标准 HTTP 状态码（200、404、500）；常用端口号（80、443、3000、8080）。
+- **MUST-08: 常量复用在先。** 定义新常量前，MUST 查阅 `docs/constant-catalog.md` 的 Constant-to-Module Index 确认是否已存在语义等效的常量。若存在，MUST 复用而非创建重复定义。
 
 ### 0.4 文件组织约定
 | 约定项 | 检测结果 | 覆盖率 | 标记 | 不一致文件 |
@@ -83,7 +101,19 @@ Scanner Agent 在 Phase F 对全量代码采样分析（每个模块最多 20 �
 5. **本章节标记为 ⬢ remediation** → 通用规则适用，但项目存在不一致需人工整改
 6. **本章节值为 `{待扫描填充}`** → Scanner 尚未执行或语言不支持该检测项
 
-> **本项目级编码规范由 Scanner Agent 自动检测生成。所有智能体编码时必须优先遵守 §0 项目级约定，其次遵循后续通用语言规范。当两者冲突时，以 §0 为准。**
+### 0.7 术语一致性约定（强制规则）
+
+⬢ **project-specific** — 术语一致性由框架强制要求，确保跨模块、跨智能体的统一命名和语义理解：
+
+- **MUST-09: 术语查阅。** 在编写任何新的类型、接口、函数、常量或文档之前，MUST 查阅 `docs/terminology-glossary.md` 的 Term Index 确认项目中已有的术语定义和用法。若目标概念已有术语定义，MUST 使用相同术语。示例：若术语表中 `User` 的定义为 "A user entity with identity and role attributes"，则新建代码中涉及用户实体的类型/函数名 MUST 使用 `User` 而非 `Account`、`Member`、`Principal` 等近义词。
+- **MUST-10: 术语一致性。** 同一概念在整个项目中 MUST 使用统一的术语名称。禁止在同一概念的变体中使用不同名称（如同时存在 `UserProfile` 和 `UserInfo` 表示同一概念）。若术语表中某术语定义了关联术语（Related Terms），它们代表不同概念，不可混用。
+- **MUST-11: 新术语注册。** 引入新领域概念（新业务实体、新流程、新状态）时，该术语 MUST 被注册到术语表中。术语注册方式：新建的 `interface` / `type` / `class` / `enum` 名称自动成为候选术语，Phase 0 重新扫描时 Scanner Agent 自动发现并注册；若新术语未自动注册（如仅作为函数名中的名词出现），Dev Agent 在 Phase 5 Report 中显式声明。
+- **MUST-12: 术语歧义消解。** 若术语表中 "Terms with No Definition" 列表包含某术语，下游智能体（SE Agent、Dev Agent）应当：
+  - 从上下文推导定义并通过 PRD 或 SE Design 明确化
+  - 在 Phase 2/3 制品中显式定义术语含义
+  - 后续 Phase 0 重新扫描将采纳显式定义更新术语表
+
+> **本项目级编码规范由 Scanner Agent 自动检测生成。所有智能体编码时必须优先遵守 §0 项目级约定，其次遵循后续通用语言规范。当两者冲突时，以 §0 为准。所有智能体编码前必须查阅 `docs/public-method-catalog.md`、`docs/constant-catalog.md`、`docs/terminology-glossary.md` 三份目录文档。**
 
 ---
 

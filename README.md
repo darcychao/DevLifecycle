@@ -55,6 +55,9 @@ Phase 1    Phase 2    Phase 3    Phase 4    Phase 5    Phase 6      Phase 7
 - `docs/project-structure.md` — 项目结构规范
 - `docs/.scanner-report.json` — 机器可读的扫描数据（含模块详情、关键词标签、功能能力、检测约定，供下游智能体消费）
 - `docs/modules/MOD-XXX.md` — 大型项目的分模块详细文档（含功能清单、依赖关系、架构合规性）
+- `docs/public-method-catalog.md` — 公共方法全量目录（含完整签名、分类、提供模块、消费模块、复用检查参考）
+- `docs/constant-catalog.md` — 常量全量目录（含名称、类型、值、位置、类别、消费文件、魔法值报告）
+- `docs/terminology-glossary.md` — 领域术语表（含自动推导定义、术语关联关系、术语→模块/方法/常量交叉引用、领域聚类）
 
 ### 标准开发流程
 
@@ -134,7 +137,7 @@ docs/requirements/
 
 | 智能体 | 职责 | 核心产出 |
 |--------|------|---------|
-| **Scanner Agent** | 项目结构扫描、模块边界识别、共享资源检测、依赖分析、**关键词提取与功能能力标注**、编码风格检测 | module-map.md（含关键词索引）、scanner-report.json、coding-standards.md §0（检测约定）、modules/MOD-XXX.md |
+| **Scanner Agent** | 项目结构扫描、模块边界识别、共享资源检测、依赖分析、**公共方法全量编目、常量全量编目、领域术语提取**、关键词提取与功能能力标注、编码风格检测 | module-map.md（含关键词索引）、public-method-catalog.md、constant-catalog.md、terminology-glossary.md、scanner-report.json、coding-standards.md §0（检测约定）、modules/MOD-XXX.md |
 | **SE Agent** | 系统架构设计、代码审核（Phase 6 硬关卡） | SE 设计文档、代码审核报告 |
 | **Dev Agent** | Story 设计、编码实现、挑战响应 | Dev Story、源代码 |
 | **Test Agent** | 测试方案设计、流程验证 | 测试方案、验证报告 |
@@ -272,6 +275,67 @@ Tier 1 (最高优先级)    Tier 2 (通用兜底)
 - **分模块详情:** `docs/modules/MOD-XXX.md` §7（每个模块的完整关键词标签列表）
 - **机器可读:** `docs/.scanner-report.json` → `keyword_index` 字段
 
+## 目录驱动的开发流程
+
+Phase 0 初始化生成的三份目录是下游智能体的 **权威参考数据源**，确保代码复用、命名一致性和术语统一。编码规范 §0 中定义了 12 条强制规则（MUST-01~MUST-12）来执行这些约束。
+
+### 公共方法目录 (`docs/public-method-catalog.md`)
+
+**用途：** 避免重复创建已存在的方法。
+
+| 索引 | 内容 | 使用场景 |
+|------|------|---------|
+| Method-to-Module Index | 所有导出方法 + 签名 + 分类 + 提供模块 | 按功能需求查找已存在的等效方法 |
+| Module-to-Methods | 每个模块的方法列表 + 消费模块 | 了解模块提供的完整 API 面 |
+| Unused Exports | 零引用的导出方法 | 清理死代码 |
+
+**强制规则 (§0.2.1)：**
+- MUST-01: 新建方法前查阅方法目录确认无重复
+- MUST-02: 新建方法后在 Phase 5 Report 中声明新增方法清单
+- MUST-03: 死代码每轮扫描审查
+- MUST-04: 新建方法分类与模块现有分类一致
+
+### 常量目录 (`docs/constant-catalog.md`)
+
+**用途：** 避免重复定义常量和魔法值。
+
+| 索引 | 内容 | 使用场景 |
+|------|------|---------|
+| Constant-to-Module Index | 所有常量 + 种类 + 值 + 类别 + 定义模块 | 按类别/值查找已存在的等效常量 |
+| Module-to-Constants | 每个模块的常量列表 + 消费文件 | 了解模块的配置和错误码体系 |
+| Shared Constants | 跨模块使用的常量 | 确保共享常量通过正确路径引用 |
+| Magic Value Report | 内联字面量超标文件 | 定位需要提取常量的代码 |
+
+**强制规则 (§0.3.1)：**
+- MUST-05: 新共享常量注册到常量目录
+- MUST-06: 同类别常量集中存储、统一命名
+- MUST-07: 业务逻辑禁止内联魔法值
+- MUST-08: 定义新常量前查阅常量目录
+
+### 术语表 (`docs/terminology-glossary.md`)
+
+**用途：** 确保跨模块、跨智能体的命名和语义统一。
+
+| 索引 | 内容 | 使用场景 |
+|------|------|---------|
+| Term Index | 术语 + 自动推导定义 + 关联模块 + 关联术语 | 确认概念在项目中的通用名称 |
+| Term-to-Module | 术语在每个模块中的上下文和关联符号 | 理解术语在不同模块中的具体含义 |
+| Domain Cluster Map | 共现术语群组 | 理解业务领域的宏观结构 |
+| Terms with No Definition | 上下文不足以推导定义的术语 | 人工补充定义 |
+
+**强制规则 (§0.7.1)：**
+- MUST-09: 编写新符号前查阅术语表
+- MUST-10: 同一概念统一术语名称（禁止同义词）
+- MUST-11: 新领域概念注册到术语表
+- MUST-12: 未定义术语在 Phase 2/3 设计中明确化
+
+### 目录维护
+
+三份目录由 Scanner Agent 在 Phase 0 初始化时自动生成基线版本。后续维护方式：
+1. **增量维护：** 每次开发任务完成后，Dev Agent 在 Phase 5 Report 中声明新增/变更的公共方法、常量和术语
+2. **审核校验：** SE Agent 在 Phase 6 Code Review 时核查实际代码与目录的一致性
+3. **全量刷新：** Phase 0 重新扫描（项目结构变更、锁文件过期 >30 天）时自动全量刷新
+
 ## 目录结构
 
 ```
@@ -294,7 +358,11 @@ H5LifecycleTemplate/
 │   │   ├── se-design.template.md
 │   │   ├── dev-story.template.md
 │   │   ├── test-plan.template.md
-│   │   └── architecture-doc.template.md
+│   │   ├── architecture-doc.template.md
+│   │   ├── module-detail.template.md
+│   │   ├── public-method-catalog.template.md
+│   │   ├── constant-catalog.template.md
+│   │   └── terminology-glossary.template.md
 │   └── standards/                         # 规范文档
 │       ├── coding-standards.template.md
 │       ├── coding-standards.javascript.md
@@ -312,6 +380,9 @@ H5LifecycleTemplate/
     ├── module-map.md                      # 共享 — 模块对照表（Phase 0）
     ├── coding-standards.md                # 共享 — 编码规范（Phase 0）
     ├── project-structure.md               # 共享 — 项目结构（Phase 0）
+    ├── public-method-catalog.md           # 共享 — 公共方法全量目录（Phase 0）
+    ├── constant-catalog.md                # 共享 — 常量全量目录（Phase 0）
+    ├── terminology-glossary.md            # 共享 — 领域术语表（Phase 0）
     ├── .scanner-report.json               # 共享 — 扫描数据（Phase 0，机器可读）
     ├── challenges/
     │   └── index.md                       # 全局挑战索引（跨需求）
