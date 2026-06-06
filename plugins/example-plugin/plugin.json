@@ -1,0 +1,9 @@
+{
+  "name": "example-plugin",
+  "version": "1.0.0",
+  "description": "Example plugin demonstrating hook structure. Adds a pre-dev checklist and post-dev log.",
+  "hooks": {
+    "dev-pre": "hooks/dev-pre.md",
+    "dev-post": "hooks/dev-post.md"
+  }
+}
