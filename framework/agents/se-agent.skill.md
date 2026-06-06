@@ -16,10 +16,12 @@ Senior system architect responsible for translating PRD requirements into techni
 ## Input
 - PRD document (from requirements provider)
 - `docs/architecture.md` — current project architecture
-- `docs/module-map.md` — module cross-reference table
+- `docs/module-map.md` — module cross-reference table with keyword index for quick capability lookup
+- `docs/.scanner-report.json` — (optional) machine-readable scan data for programmatic module lookups
 - `docs/dev-story.md` — development story (for code review)
 - `docs/test-plan.md` — test plan (for code review)
-- Language-specific coding standards
+- `docs/coding-standards.md` §0 — **project-level coding standard (highest priority)**
+- Language-specific coding standards (generic, overridden by §0 when conflicts exist)
 - `framework/standards/project-structure.template.md`
 
 ## Output
@@ -36,7 +38,8 @@ Senior system architect responsible for translating PRD requirements into techni
 ### Step 2: Analyze Existing Architecture
 - Read `docs/architecture.md` to understand current system
 - Identify which modules are affected by the PRD
-- Check `docs/module-map.md` for module dependencies
+- Consult `docs/module-map.md` keyword index to locate modules with relevant capabilities
+- Check `docs/module-map.md` for module dependencies and functional dependencies
 - Determine if architectural changes are needed
 
 ### Step 3: Design Technical Solution
@@ -67,7 +70,8 @@ This step is invoked by the orchestrator after Dev Agent completes coding (Phase
 - Read `docs/dev-story.md` — understand what was supposed to be built
 - Read `docs/test-plan.md` — understand acceptance criteria and test cases
 - Read the code diff — all files changed/created by Dev Agent
-- Load the language-specific coding standards
+- Load `docs/coding-standards.md` §0 (project-level standard) as the primary coding reference
+- Load the language-specific coding standards (generic, overridden by §0 when conflicts exist)
 
 #### 7.2 Execute 8-Item Checklist
 
@@ -90,16 +94,18 @@ Verify the code follows the Dev Story specifications:
 - Document any intentional deviations (must be justified)
 
 **CR-3: Standards Compliance**
-Verify code follows language-specific coding standards:
-- Check naming conventions (files, variables, functions, classes)
-- Check formatting (indentation, line length, braces, quotes)
+Verify code follows project-level standard first, then language-specific standards:
+- Check `docs/coding-standards.md` §0 first — project-level conventions take highest priority
+- Check naming conventions (files, variables, functions, classes) — §0 overrides generic when conflicting
+- Check formatting (indentation, line length, braces, quotes) — §0 detected conventions override generic
 - Check prohibited patterns from the "禁止事项" checklist
-- Verify file organization follows project structure standards
+- Verify file organization follows `docs/project-structure.md` and §0.4 file organization conventions
 
 **CR-4: Architectural Integrity**
 Verify code respects the project architecture:
 - Check import graph for new circular dependencies
 - Verify module dependency rules (core → business → ui)
+- Verify functional dependency integrity: new code should not bypass documented capability providers. If `docs/module-map.md` shows Module A provides capability X, new consumers of X should import from Module A
 - Check public API encapsulation (no leaked internals)
 - Verify alignment with `docs/architecture.md`
 
@@ -164,10 +170,11 @@ Before declaring any phase complete, the SE Agent MUST proactively check for:
 
 ### CAT-2: Standards Violations
 - [ ] SE Design module structure follows `docs/project-structure.md` and detected conventions (§0)
-- [ ] All interface definitions follow naming conventions (`docs/coding-standards.md` §1)
-- [ ] Code under review follows all 15 chapters of language-specific standards
+- [ ] All interface definitions follow naming conventions (`docs/coding-standards.md` §0 first, then §1)
+- [ ] Code under review follows project-level standard (§0) as primary reference
+- [ ] Code under review follows all 15 chapters of language-specific standards (where not overridden by §0)
 - [ ] No prohibited patterns from standards "禁止事项" checklist
-- **If violation found:** Raise CAT-2 challenge immediately with specific standards citation + file:line
+- **If violation found:** Raise CAT-2 challenge immediately with specific standards citation (§0.X or §N) + file:line
 
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Analyze the challenge, determine if valid. If valid, revise and re-output. If invalid, provide counter-argument with evidence.

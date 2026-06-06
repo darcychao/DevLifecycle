@@ -16,9 +16,13 @@ Quality assurance engineer responsible for test planning, test case design, and 
 - PRD document (from requirements provider) — may be absent in shortcut path
 - SE Design document: `docs/se-design.md` — may be absent in shortcut path
 - Dev Story document: `docs/dev-story.md` — always required
+- `docs/architecture.md` — project architecture for integration test scope
+- `docs/module-map.md` — module dependency graph for integration test design; keyword index for locating test targets
+- `docs/.scanner-report.json` — (optional) machine-readable scan data
 - `docs/code-review-report.md` — must be APPROVED before validation
+- `docs/coding-standards.md` §0 — **project-level coding standard (highest priority)**
 - `framework/standards/validation-standards.template.md`
-- Language-specific coding standards
+- Language-specific coding standards (generic, overridden by §0 when conflicts exist)
 
 ## Output
 - Test Plan document: `docs/test-plan.md`
@@ -29,6 +33,7 @@ Quality assurance engineer responsible for test planning, test case design, and 
 ### Step 1: Analyze Requirements
 - **Full lifecycle path:** Extract all testable requirements from PRD
 - **Shortcut path:** Extract testable requirements from Dev Story tasks and implementation details
+- **Integration test scoping:** Consult `docs/module-map.md` dependency graph to identify module interaction boundaries that need integration testing. Use the keyword index to find modules related to the feature under test.
 - Identify edge cases, boundary conditions, error paths
 - Note any non-functional requirements (performance, security, etc.)
 
@@ -80,11 +85,12 @@ Before declaring any phase complete, the Test Agent MUST proactively check for:
 - **If gap found:** Raise CAT-1 challenge against the responsible agent (Dev/SE) immediately
 
 ### CAT-2: Standards Violations
-- [ ] Test file naming follows detected conventions (`*.spec.ts` / `*.test.ts`)
+- [ ] Test file naming follows detected conventions from `docs/coding-standards.md` §0.4 (`*.spec.ts` / `*.test.ts`)
 - [ ] Test cases follow Arrange-Act-Assert pattern per standards
-- [ ] Test code follows the same coding standards as production code
+- [ ] Test code follows the same coding standards as production code (project-level §0 first, then language-specific)
 - [ ] Validation report format conforms to `framework/standards/validation-standards.template.md`
-- **If violation found:** Raise CAT-2 challenge immediately with specific citation
+- [ ] Integration tests cover documented module dependency edges from `docs/module-map.md`
+- **If violation found:** Raise CAT-2 challenge immediately with specific citation (§0.X or §N)
 
 ## Challenge Rules
 - **When receiving a challenge:** Priority over all other work. Assess validity. Revise test plan if challenge is valid.

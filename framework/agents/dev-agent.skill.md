@@ -17,9 +17,12 @@ Senior software engineer responsible for detailed implementation design, coding,
 - SE Design document: `docs/se-design.md`
 - PRD document (for context)
 - `docs/architecture.md` — project architecture
+- `docs/module-map.md` — module cross-reference with keyword index for quick capability lookup
+- `docs/.scanner-report.json` — (optional) machine-readable scan data for programmatic module lookups
+- `docs/coding-standards.md` §0 — **project-level coding standard (highest priority)**
 - `docs/dev-story.md` (in shortcut path, this is the source of truth)
 - `docs/test-plan.md`
-- Language-specific coding standards
+- Language-specific coding standards (generic, overridden by §0 when conflicts exist)
 - `framework/standards/project-structure.template.md`
 
 ## Output
@@ -48,18 +51,20 @@ Senior software engineer responsible for detailed implementation design, coding,
 - Address feedback, revise as needed
 
 ### Step 4: Implement Code
+- **4.0: Locate relevant modules** — Consult the Keyword-to-Module Index in `docs/module-map.md` to find which existing modules provide the capabilities needed by the current task. Identify which modules will need modification and which shared resources (components, methods, infrastructure) are available for reuse.
 - Write code following Dev Story exactly
-- Adhere to language-specific coding standards
-- Follow `framework/standards/project-structure.template.md`
+- Adhere to project-level coding standard (`docs/coding-standards.md` §0) as primary reference
+- Adhere to language-specific coding standards (where not overridden by §0)
+- Follow `framework/standards/project-structure.template.md` and §0.4 file organization conventions
 - Write self-documenting code; minimal comments only for non-obvious logic
-- Include error handling for all documented error scenarios
+- Include error handling for all documented error scenarios (follow §0.2 error handling conventions)
 - Validate all external input at boundaries
 
 ### Step 5: Self-Validation (pre-Code Review)
 Before handing off for code review, the Dev Agent MUST self-check against the 8-item Code Review Checklist (defined in `framework/workflows/standard-lifecycle.rule.md` §Phase 6):
 - CR-1: All requirements implemented, no TODOs or stubs
 - CR-2: Code structure matches Dev Story specifications
-- CR-3: Language standards followed, no prohibited patterns
+- CR-3: Project-level standard (§0) followed first, language standards followed, no prohibited patterns
 - CR-4: No new circular dependencies, architecture respected
 - CR-5: Error handling complete, edge cases covered
 - CR-6: Tests written for all new code, existing tests pass
@@ -95,11 +100,12 @@ Before declaring any phase complete, the Dev Agent MUST proactively check for:
 - **If gap found:** Raise CAT-1 challenge against SE Agent immediately
 
 ### CAT-2: Standards Violations
-- [ ] Dev Story file paths follow detected organization pattern (`docs/project-structure.md`)
-- [ ] All function signatures, class structures follow naming conventions (`docs/coding-standards.md` §1)
-- [ ] Code implements error handling per standards (§9) for all documented error scenarios
+- [ ] Dev Story file paths follow detected organization pattern (`docs/project-structure.md` and §0.4)
+- [ ] All function signatures, class structures follow naming conventions (`docs/coding-standards.md` §0.2 first, then §1)
+- [ ] Code implements error handling per project-level conventions (§0.2) and standards (§9) for all documented error scenarios
 - [ ] No prohibited patterns from standards "禁止事项" checklist in the implementation
-- [ ] New files placed in correct directories per module organization rules (§7.4)
+- [ ] New files placed in correct directories per module organization rules (§7.4) and §0.4 file organization conventions
+- [ ] New or modified public API symbols have keywords consistent with the module's keyword tags in `docs/module-map.md`
 - **If violation found:** Raise CAT-2 challenge immediately or self-correct before handoff
 
 ## Challenge Rules

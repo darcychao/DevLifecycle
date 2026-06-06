@@ -301,6 +301,18 @@ Module Reference Map:
 - **Modules:** {count}
 - **Generated:** {date}
 
+## Keyword-to-Module Index
+
+| Keyword | Module | Capability |
+|---------|--------|------------|
+| auth, login, token | MOD-003 (Auth) | Authentication & Session Management |
+| user, profile, account | MOD-004 (User) | User CRUD Operations |
+| format, date, time | MOD-008 (SharedUtils) | Date/Time Formatting Utilities |
+| validate, sanitize, check | MOD-005 (Validators) | Input Validation & Sanitization |
+| ... | ... | ... |
+
+*Keywords extracted from exported symbol names (split on camelCase/PascalCase/snake_case), directory basenames, and file basenames. Stop words filtered. Sorted alphabetically.*
+
 ## File-to-Module Cross-Reference
 | File Path | Module ID | Module Name | Classification | Lines | Shared |
 |-----------|-----------|-------------|----------------|-------|--------|
@@ -328,10 +340,99 @@ Module Reference Map:
 ## Module Details
 ### MOD-XXX: {Name}
 - **Type:** {type} | **Path:** {path} | **Files:** {count} ({lines} lines)
+- **Keywords:** {comma-separated keyword list}
+- **Functional Capabilities:** {capability label 1}, {capability label 2}, ...
 - **Public API:** (exported symbols)
-- **Depends on:** (module IDs with weights)
-- **Depended by:** (module IDs)
+- **Depends on:** MOD-XXX [weight, N files], MOD-YYY [weight, N files], ...
+- **Depended by:** MOD-ZZZ [weight, N files], ...
 ```
+
+#### E.1.5 Keyword Extraction & Functional Capability Analysis
+
+After completing the module details, the scanner extracts keyword tags and infers functional capability labels for each module. These enable downstream agents to quickly locate modules by functional keywords.
+
+##### Keyword Extraction Algorithm
+
+For each module, derive keywords from three sources:
+
+**Source 1 — Exported symbol names:**
+Split camelCase/PascalCase/snake_case names into constituent words:
+- `getUserProfileById` → [`get`, `user`, `profile`, `by`, `id`]
+- `OrderService` → [`order`, `service`]
+- `MAX_RETRY_COUNT` → [`max`, `retry`, `count`]
+
+**Source 2 — Parent directory basename:**
+Use the module's directory basename as a keyword:
+- `src/features/auth/` → `auth`
+- `src/shared/utils/` → `utils`, `shared`
+
+**Source 3 — File basenames (without extension):**
+- `login-service.ts` → [`login`, `service`]
+- `user-repository.ts` → [`user`, `repository`]
+
+**Combine and filter:**
+1. Merge all tokens, lowercase, de-duplicate
+2. Remove English stop words: `get`, `set`, `from`, `to`, `by`, `with`, `and`, `the`, `is`, `on`, `of`, `in`, `for`, `a`, `an`, `it`, `at`, `or`, `as`, `be`, `not`, `this`, `that`, `has`, `have`, `do`, `does`, `will`, `can`, `all`, `new`, `use`, `used`, `into`, `its`
+3. Sort alphabetically
+4. Truncate to top 30 keywords (for modules with very large public API surfaces)
+
+##### Functional Capability Labeling
+
+For each module, infer 1-5 functional capability labels by analyzing the aggregate of exported symbol names:
+
+**Step 1 — Extract verb prefixes** from exported function/method names:
+| Verb Pattern | Category Label |
+|-------------|----------------|
+| `login`, `logout`, `authenticate`, `authorize`, `verify` | Authentication |
+| `create*`, `update*`, `delete*`, `get*ById`, `save*` | CRUD Operations |
+| `validate*`, `sanitize*`, `check*`, `verify*` | Validation |
+| `format*`, `parse*`, `transform*`, `convert*` | Data Transformation |
+| `fetch*`, `send*`, `request*`, `upload*`, `download*` | API Communication |
+| `render*`, `display*`, `show*`, `draw*` | UI Rendering |
+| `calculate*`, `compute*`, `aggregate*`, `sum*` | Computation |
+| `subscribe*`, `emit*`, `dispatch*`, `notify*`, `publish*` | Event Handling |
+| `save*`, `load*`, `persist*`, `cache*`, `read*`, `write*` | Data Persistence |
+| `init*`, `setup*`, `bootstrap*`, `start*`, `stop*` | Lifecycle Management |
+
+**Step 2 — Extract noun targets** from exported class/interface/type names:
+| Noun Pattern | Domain Label |
+|-------------|-------------|
+| `User*`, `Account*`, `Profile*`, `Role*`, `Permission*` | User Management |
+| `Order*`, `Cart*`, `Checkout*`, `Payment*`, `Transaction*` | Order Processing |
+| `Product*`, `Inventory*`, `Catalog*`, `Item*`, `SKU*` | Product Catalog |
+| `Config*`, `Settings*`, `Env*`, `Option*` | Configuration |
+| `Log*`, `Metric*`, `Monitor*`, `Trace*`, `Event*` | Observability |
+| `Notification*`, `Alert*`, `Email*`, `Message*` | Messaging & Notifications |
+| `Report*`, `Analytics*`, `Dashboard*`, `Chart*` | Reporting & Analytics |
+| `File*`, `Upload*`, `Download*`, `Storage*`, `Asset*` | File Management |
+| `Api*`, `Client*`, `Service*`, `Endpoint*` | API/Service Layer |
+| `Route*`, `Router*`, `Navigation*`, `Page*` | Routing & Navigation |
+
+**Step 3 — Combine categories + domains** to produce capability labels (max 80 chars):
+- Exports [`login`, `logout`, `getCurrentUser`, `AuthService`, `UserToken`]
+  → "Authentication & Session Management"
+- Exports [`formatDate`, `formatCurrency`, `parseISO`, `DateFormat`]
+  → "Date/Time Formatting Utilities"
+- Exports [`createUser`, `getUserById`, `updateUser`, `deleteUser`, `UserRepository`]
+  → "User CRUD Operations"
+
+**Fallback:** If no verb/noun patterns match, use the module type + name as the capability label (e.g., "Feature: Auth" for a business module, "Utility: SharedUtils" for a utility module).
+
+##### Generating the Keyword Index Table
+
+1. For each keyword, list all modules that match it
+2. Group related keywords into a single row when they all point to the same module
+3. Include the primary functional capability label beside each entry
+4. Sort rows alphabetically by the first keyword in each group
+5. If a module has no keywords (empty public API), list it with keyword "—" and capability "No Public API"
+
+##### Quality Gates
+- Every module has at least 3 keyword tags generated (WARNING if fewer)
+- No English stop words appear in the keyword index
+- Every module has at least 1 functional capability label (WARNING if none)
+- Module with zero exports (empty public API) is flagged with capability "No Public API"
+
+---
 
 #### E.2 Scanner Report (`docs/.scanner-report.json`)
 Machine-readable JSON for downstream agent consumption:
@@ -350,7 +451,27 @@ Machine-readable JSON for downstream agent consumption:
   },
   "modules": {
     "total": 8,
-    "by_type": { "core": 1, "business": 3, "ui": 2, "infrastructure": 1, "utility": 1 }
+    "by_type": { "core": 1, "business": 3, "ui": 2, "infrastructure": 1, "utility": 1 },
+    "details": [
+      {
+        "id": "MOD-001",
+        "name": "AppEntry",
+        "type": "core",
+        "path": "src/",
+        "file_count": 3,
+        "total_lines": 156,
+        "complexity": false,
+        "keywords": ["app", "entry", "index", "main", "server", "start"],
+        "capabilities": ["Application Bootstrap"],
+        "exports": [
+          { "name": "startServer", "kind": "function", "signature": "async (port: number): Promise<Server>", "keywords": ["start", "server"] }
+        ],
+        "dependencies": {
+          "depends_on": [{ "module_id": "MOD-007", "weight": "light", "files_imported": 1 }],
+          "depended_by": []
+        }
+      }
+    ]
   },
   "shared_resources": {
     "components": [{ "name": "Button", "path": "src/shared/components/Button.tsx", "used_by": ["auth", "dashboard", "settings"] }],
@@ -361,6 +482,11 @@ Machine-readable JSON for downstream agent consumption:
     "total_edges": 23,
     "circular": 0,
     "violations": []
+  },
+  "keyword_index": {
+    "auth": [{ "module_id": "MOD-003", "module_name": "Auth", "capability": "Authentication & Session Management" }],
+    "login": [{ "module_id": "MOD-003", "module_name": "Auth", "capability": "Authentication & Session Management" }],
+    "user": [{ "module_id": "MOD-004", "module_name": "User", "capability": "User CRUD Operations" }, { "module_id": "MOD-003", "module_name": "Auth", "capability": "Authentication & Session Management" }]
   },
   "module_paths": {
     "aliases": { "@": "src/", "@shared": "src/shared/", "@features": "src/features/" },
@@ -373,16 +499,18 @@ Machine-readable JSON for downstream agent consumption:
 
 #### E.3 Architecture Document Contributions
 The scanner provides data for these sections of `docs/architecture.md`:
-- **§2 Module Architecture** — full module inventory with types
-- **§3 Module Dependency Graph** — ASCII diagram + dependency matrix
+- **§2 Module Architecture** — full module inventory with types, keywords, and functional capabilities
+- **§3 Module Dependency Graph** — ASCII diagram + dependency matrix (enhanced with functional dependency annotations)
 - **§4 Data Architecture** — detected model/entity files and their relationships
-- **§5 API/Interface Architecture** — public API surface grouped by module
+- **§5 API/Interface Architecture** — public API surface grouped by module, annotated with capability labels
 
 ---
 
-### Phase F: Coding Style & Convention Detection
+### Phase F: Generate Project-Level Coding Standard
 
-This phase analyzes the actual code in the scanned files to detect the project's existing coding conventions. The results are merged into `docs/coding-standards.md` as a **§0: Project-Detected Conventions** section that supplements (and where conflicting, overrides) the generic language standard.
+This phase analyzes actual code to detect the project's existing conventions, then generates the **authoritative project-level coding standard**. This document (`docs/coding-standards.md` §0) is the primary reference for all downstream agents — when it conflicts with the generic language standard, the project-level convention **always** takes precedence.
+
+The project-level standard covers three domains: public methods, constant definitions, and code organization conventions.
 
 #### F.1 Public Method / Shared Utility Naming Detection
 
@@ -411,6 +539,50 @@ Analyze all exported functions in `utility` and `service` classified files:
 | Error handling | throw custom AppError subclasses | 82% | `throw new NotFoundError('User', id)` |
 | Parameter naming | Single object param for >3 args | 68% | `createUser({ name, email, role }: CreateUserInput)` |
 ```
+
+#### F.1.5 Constant Definition Detection
+
+Detect how the project defines and organizes constants, enums, and magic values:
+
+| Detection Target | Method | Example Output |
+|-----------------|--------|----------------|
+| **Constant naming** | Check `const`/`readonly` declarations at module/file scope | `UPPER_SNAKE_CASE` (92%), `camelCase` (8%) |
+| **Enum naming** | Check enum member naming patterns | `PascalCase` members (100%) |
+| **Constant location** | Detect where constants are defined | `src/shared/constants/` (78%), co-located with usage (22%) |
+| **Grouping pattern** | How constants are grouped | Single `constants.ts` per domain (65%), `enum` objects (35%) |
+| **Magic value tolerance** | Count inline literals in business logic vs extracted constants | Extracted (82%), inline magic numbers (18%) |
+| **Type of constant** | `const` vs `enum` vs `as const` objects | `enum` for related sets (55%), `as const` (28%), bare `const` (17%) |
+| **Export pattern** | Named export vs default, barrel re-export | Named export (96%), via barrel `index.ts` (74%) |
+| **String constant pattern** | How string constants are defined (API paths, error codes, config keys) | `const API_*` prefix pattern (88%), nested objects (12%) |
+
+**Detection algorithm:**
+1. Scan all files for top-level `const`, `enum`, `readonly` declarations
+2. Classify each by: naming case, location (shared vs co-located), export pattern
+3. Count inline literals (magic numbers/strings) in business logic files
+4. Flag files where >5% of statements are inline literals → magic value cleanup candidates
+5. Determine dominant patterns (threshold: >70% coverage)
+
+**Output — Constant Convention Report:**
+```markdown
+## Detected Constant Conventions
+| Convention | Dominant Pattern | Coverage | Deviations |
+|-----------|-----------------|----------|------------|
+| Constant naming | `UPPER_SNAKE_CASE` for module-level `const` | 92% | `src/features/auth/config.ts:12` uses camelCase |
+| Enum members | `PascalCase` | 100% | — |
+| Constant location | `src/shared/constants/{domain}.ts` | 78% | 6 constants co-located in feature files |
+| Grouping | One `constants.ts` per domain | 65% | `src/shared/constants/misc.ts` — mixed domains |
+| Magic values | Extracted to named constants (82%) | 82% | `src/utils/validation.ts:45` inline `1000` |
+| Type preference | `enum` for related sets, `as const` for unions | 55/28 split | — |
+| Export pattern | Named export via barrel `index.ts` | 74% | 3 constant files exported directly (no barrel) |
+| String pattern | `UPPER_SNAKE` with `API_`/`ERR_`/`CFG_` prefixes | 88% | — |
+```
+
+**Rules derived for project-level standard:**
+- New constants MUST use `UPPER_SNAKE_CASE` at module scope
+- New enum-like constants MUST use `enum` (preferred) or `as const`
+- Constants shared across 2+ modules MUST live in `src/shared/constants/`
+- String constants MUST follow detected prefix convention (`API_*`, `ERR_*`, `CFG_*`)
+- Magic values in business logic → flagged for extraction
 
 #### F.2 File Organization Pattern Detection
 
@@ -486,15 +658,19 @@ Analyze actual code to detect:
 | Line width | ≤120 chars preferred | 97% within | `src/shared/utils/validation.ts:234` (186 chars) |
 ```
 
-#### F.4 Merge Detected Conventions into Coding Standards
+#### F.4 Generate Project-Level Coding Standard
 
-The scanner produces a **Convention Merge Report** that the orchestrator uses to customize `docs/coding-standards.md`:
+The orchestrator uses the scanner's convention reports to produce the **authoritative project-level coding standard** at `docs/coding-standards.md`. This is NOT a merge of equals — the project-level standard (§0) is the **primary reference** for all downstream agents.
 
-**Merge rules:**
-1. **Detected convention matches generic standard** → keep generic rule, annotate "✓ confirmed by project scan"
-2. **Detected convention differs from generic standard** → project convention OVERRIDES generic rule, annotate "⚠ overridden by project detection"
-3. **Generic standard has a rule not detectable in code** → keep generic rule, annotate "◈ generic — not verifiable by scan"
-4. **Inconsistency detected (<70% coverage)** → flag as "⚠ remediation needed", list deviating files
+**Generation algorithm:**
+1. Copy the matched language standard from `framework/standards/coding-standards.<lang>.md`
+2. Prepend **§0: Project-Level Coding Standard** containing all three detection reports (F.1 public methods, F.1.5 constants, F.2 file organization, F.3 coding style)
+3. For each generic rule, apply merge action:
+   - **confirm:** Rule matches project → keep, annotate "✓ confirmed"
+   - **override:** Project differs → **REPLACE** with project convention, annotate "⚠ project standard overrides"
+   - **add:** Project has a convention not in generic → add as **new mandatory rule**, annotate "⬢ project-specific rule"
+4. Flag inconsistencies (<70% coverage) as remediation items with specific file paths
+5. Append a mandatory footer: **"本项目级编码规范由 Scanner Agent 自动检测生成。所有智能体编码时必须优先遵守 §0 项目级约定，其次遵循后续通用语言规范。当两者冲突时，以 §0 为准。"**
 
 **Output — `.scanner-report.json` additions:**
 ```json
@@ -505,6 +681,15 @@ The scanner produces a **Convention Merge Report** that the orchestrator uses to
       "verb_prefixes": ["get", "create", "update", "delete", "fetch", "validate"],
       "async_pattern": { "dominant": "async/await", "coverage": 0.74 },
       "error_pattern": { "dominant": "custom_AppError", "coverage": 0.82 }
+    },
+    "constants": {
+      "naming": { "pattern": "UPPER_SNAKE_CASE", "coverage": 0.92 },
+      "type_preference": { "enum": 0.55, "as_const": 0.28, "bare_const": 0.17 },
+      "location": { "pattern": "src/shared/constants/{domain}.ts", "coverage": 0.78 },
+      "grouping": { "pattern": "one file per domain", "coverage": 0.65 },
+      "export_pattern": { "pattern": "named via barrel index.ts", "coverage": 0.74 },
+      "magic_value_rate": { "extracted": 0.82, "inline": 0.18 },
+      "string_prefixes": ["API_", "ERR_", "CFG_", "MSG_"]
     },
     "file_organization": {
       "directory_naming": { "pattern": "kebab-case", "coverage": 0.95 },
