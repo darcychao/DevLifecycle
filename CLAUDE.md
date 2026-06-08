@@ -1,6 +1,6 @@
 # General Development Lifecycle Framework
 
-AI-agent-driven software development lifecycle framework. Orchestrates specialized agents through PRD→SE→Story→Test→Dev→Code Review→Validation workflow with built-in challenge/audit and plugin extension mechanisms. Supports a Dev-Story shortcut path.
+AI-agent-driven software development lifecycle framework. Orchestrates specialized agents (Scanner, SE, UX, Dev, Test) through PRD→SE→UX Spec→Story→Test→Dev→Code Review→Validation workflow with built-in challenge/audit, plugin extension, and UX constraint enforcement. Supports a Dev-Story shortcut path.
 
 ## Architecture Overview
 
@@ -8,14 +8,15 @@ AI-agent-driven software development lifecycle framework. Orchestrates specializ
 ┌──────────────────────────────────────────────────────────────────┐
 │                       CLAUDE.md (Orchestrator)                    │
 ├──────────────────────────────────────────────────────────────────┤
-│  Agents Layer       │ Scanner │ SE Agent │ Dev Agent │ Test Agent│
+│  Agents Layer       │ Scanner │ SE │ UX │ Dev │ Test Agents       │
 ├──────────────────────────────────────────────────────────────────┤
 │  Workflow Layer     │  Standard Lifecycle + Challenge + Plugin    │
-│                     │  + Dev-Story Shortcut                       │
+│                     │  + Dev-Story Shortcut + UX Spec + Review    │
 ├──────────────────────────────────────────────────────────────────┤
-│  Artifacts Layer    │  PRD │ SE Design │ Story │ Test Plan       │
+│  Artifacts Layer    │  PRD │ SE Design │ UX Spec │ Story │ Test  │
 ├──────────────────────────────────────────────────────────────────┤
 │  Standards Layer    │  Coding(JS/TS/Java/Python) │ Structure      │
+│                     │  + UX Guidelines (if UI detected)           │
 ├──────────────────────────────────────────────────────────────────┤
 │  Plugin Layer       │  Custom hooks injected at each stage        │
 └──────────────────────────────────────────────────────────────────┘
@@ -33,6 +34,8 @@ AI-agent-driven software development lifecycle framework. Orchestrates specializ
 @CLAUDE.md 初始化框架
 ```
 
+Full initialization protocol: `framework/workflows/initialization.rule.md`
+
 ---
 
 ## Entry Points
@@ -47,7 +50,7 @@ Executes the complete 7-phase lifecycle: PRD → SE Design → Story → Test Pl
 ```
 @CLAUDE.md 基于Dev Story开始开发
 ```
-User provides a pre-existing `docs/dev-story.md`. The framework bypasses upstream phases:
+User provides a pre-existing Dev Story. The framework bypasses upstream phases:
 
 | Artifacts Present | Entry Phase |
 |-------------------|-------------|
@@ -60,445 +63,23 @@ User provides a pre-existing `docs/dev-story.md`. The framework bypasses upstrea
 
 ---
 
-## Requirement Directory Model
-
-Each requirement/feature gets an isolated directory under `docs/requirements/`. All lifecycle artifacts, reports, and challenges for that requirement live within it. Shared project-level docs (architecture, standards, module map) remain at `docs/` root.
-
-### Directory Layout
-```
-docs/
-├── architecture.md                   # Shared — project-wide
-├── module-map.md                     # Shared — project-wide
-├── coding-standards.md               # Shared — project-wide
-├── project-structure.md              # Shared — project-wide
-├── challenges/
-│   └── index.md                      # Shared — global challenge index
-└── requirements/
-    ├── index.md                      # Requirement registry
-    └── REQ-YYYY-NNN-{slug}/
-        ├── prd.md                    # Phase 1 artifact
-        ├── se-design.md              # Phase 2 artifact
-        ├── dev-story.md              # Phase 3 artifact
-        ├── test-plan.md              # Phase 4 artifact
-        ├── reports/
-        │   ├── phase-1-prd-report.md
-        │   ├── phase-2-se-design-report.md
-        │   ├── phase-3-story-design-report.md
-        │   ├── phase-4-test-plan-report.md
-        │   ├── phase-5-dev-coding-report.md
-        │   ├── phase-6-code-review-report.md
-        │   └── phase-7-validation-report.md
-        └── challenges/
-            └── CH-YYYY-NNN.md
-```
-
-### Requirement Index (`docs/requirements/index.md`)
-```markdown
-# Requirement Index
-| REQ ID | Name | Status | Current Phase | Created | Completed |
-|--------|------|--------|---------------|---------|-----------|
-| REQ-2026-001 | user-auth | Phase 5 | 2026-06-06 | - |
-| REQ-2026-002 | payment | Phase 2 | 2026-06-06 | - |
-```
-Status values: `ACTIVE`, `COMPLETED`, `ABANDONED`, `ON-HOLD`.
-
-### Requirement Lifecycle
-1. **Creation:** When a new PRD is provided (Entry A) or a Dev Story is provided (Entry B), the orchestrator assigns a REQ-ID and creates the requirement directory
-2. **Execution:** All phases for this requirement write into its directory
-3. **Completion:** When Phase 7 passes, the requirement is marked COMPLETED in the index
-4. **Parallel requirements:** Multiple requirements can be ACTIVE simultaneously; each has its own directory and independent phase state
-
-### REQ-ID Assignment
-- Format: `REQ-YYYY-NNN` (year + 3-digit sequential counter)
-- Counter resets per year, padded to 3 digits (001, 002, ...)
-- Slug is derived from the PRD title or Dev Story name, lowercased with hyphens
-
----
-
-## Phase 0: Initialization Protocol
-
-### Enforcement Rules
-1. Before ANY lifecycle operation, verify `docs/.framework-init.lock` exists. If absent, REJECT.
-2. Re-initialization: only on explicit user request — delete lock, re-run from scratch.
-3. Staleness: if lock >30 days old, suggest re-init but don't force.
-4. Empty project: still execute Phase 0 (minimal scaffolding), still create lock.
-5. Partial init forbidden: if any step fails, report, roll back docs, instruct user.
-
-### Protocol Flow (8 sequential steps)
-
-```
-Step 0.1 → Step 0.2 → Step 0.3 → Step 0.4 → Step 0.5 → Step 0.6 → Step 0.7 → Step 0.8
-Detect    Scan      Identify   Analyze    Generate   Validate   Classify   Create
-Language  Files     Modules    Deps       Docs       & Report   Project    Lock
-```
-
-### Step 0.1: Detect Language Stack & Metadata
-Scan project root for build manifests in priority order: `package.json` → `tsconfig.json` → `pom.xml` → `build.gradle` → `pyproject.toml` → `Cargo.toml` → `go.mod` → `*.csproj` → `Gemfile` → `CMakeLists.txt` → `pubspec.yaml`. Detect frameworks from dependencies (React/Vue/Angular/Express/Next/NestJS from `package.json`; Spring Boot/Quarkus from Java manifests; Django/Flask/FastAPI from Python manifests). Detect package manager from lock files. Extract project name, version, description, entry point, minimum runtime. Record complete language stack.
-
-**Multi-root/monorepo:** If multiple first-level subdirectories each have their own manifest, flag as monorepo — list each sub-project separately. Primary = repo root.
-
-**No manifest:** List all file extensions, present top 3 to user for confirmation, then load/generate standards.
-
-### Step 0.2-0.4: Project Structure Scan → Delegate to Scanner Agent
-
-Steps 0.2 (File Scanning), 0.3 (Module Identification), and 0.4 (Dependency Analysis) are executed by the **Project Scanner Agent** (`framework/agents/project-scanner.skill.md`).
-
-The scanner performs six phases:
-| Phase | Description | Key Output |
-|-------|-------------|------------|
-| **A. File Discovery** | Scan all source files, classify each by type, detect organizational pattern | File inventory with classifications |
-| **B. Shared Resource Detection** | Identify shared components, methods, and infrastructure used across 2+ modules | Shared component/method/infra catalogs |
-| **C. Module Boundaries** | Group files into modules, resolve path aliases, determine public API surfaces | Module inventory with import paths |
-| **D. Dependency Analysis** | Map all import edges, classify weights, detect circular/bidirectional deps | Dependency matrix + violation report |
-| **E. Generate Output** | Produce `docs/module-map.md`, `docs/.scanner-report.json`, architecture contributions | Machine-readable scan data |
-| **F. Generate Project-Level Standard** | Detect public methods, constant definitions, file organization, coding style from actual code | **Authoritative `docs/coding-standards.md` §0** — all agents must prioritize this over generic standards |
-
-**Key differentiators from generic file scanning:**
-- **Shared vs. module-private:** Every component/utility is classified by its usage scope (shared if imported by 2+ modules)
-- **Path alias resolution:** All imports are resolved through `tsconfig.json` paths or equivalent to produce canonical module paths
-- **Reference relationship map:** Full directed graph showing which modules reference which, with edge weights
-- **Architecture rules for shared code:** Shared components MUST NOT import from feature modules; features SHOULD NOT directly import from other features
-
-The orchestrator invokes this skill during Phase 0 and on structural changes. See `framework/agents/project-scanner.skill.md` for the complete protocol.
-
-### Step 0.5: Generate Documentation
-Produce files in `docs/` (minimal set for empty projects):
-
-| Document | Source |
-|----------|--------|
-| `docs/architecture.md` | Data from Steps 0.1 + Scanner Agent (Phases C/D) |
-| `docs/module-map.md` | Scanner Agent (Phase E.1) |
-| `docs/coding-standards.md` | Copy/adapt from `framework/standards/coding-standards.<lang>.md` |
-| `docs/project-structure.md` | `framework/standards/project-structure.template.md` + detected pattern |
-| `docs/.scanner-report.json` | Scanner Agent (Phase E.2) — machine-readable scan data |
-| `docs/modules/MOD-XXX.md` | Scanner Agent (Phase E.1) — follows `framework/artifacts/module-detail.template.md` |
-| `docs/public-method-catalog.md` | Scanner Agent (Phase E.3) — follows `framework/artifacts/public-method-catalog.template.md` |
-| `docs/constant-catalog.md` | Scanner Agent (Phase E.4) — follows `framework/artifacts/constant-catalog.template.md` |
-| `docs/terminology-glossary.md` | Scanner Agent (Phase E.5) — follows `framework/artifacts/terminology-glossary.template.md` |
-
-`architecture.md` must include: project overview (Step 0.1), module architecture (Step 0.3), dependency graph with ASCII diagram (Step 0.4), data architecture, API architecture, cross-cutting concerns, evolution history. Mandatory ASCII diagrams: high-level architecture + module dependency graph.
-
-`module-map.md` must include: summary, keyword-to-module index (enabling quick module lookup by functional keywords — extracted from exported symbol names, directory names, and file names), file-to-module cross-reference table (every source file), shared resources summary, per-module detail sections (type, path, files, keywords, functional capabilities, public API, depends on with weights, depended by with weights). For >50 source files, detail sections can be collapsed with note to `docs/modules/MOD-XXX.md`.
-
-`docs/modules/MOD-XXX.md` — per-module detail documents follow the template at `framework/artifacts/module-detail.template.md`. Each must include: function/capability inventory (all exported symbols with signatures, keywords, and descriptions — §1), public API surface (§2), structural dependencies with edge weights (§3), functional dependencies — required and provided capabilities (§4), file inventory (§5), architecture rules compliance (§6), keyword tags (§7), and appendix with path alias resolution (§8).
-
-`public-method-catalog.md` must include: method-to-module index (every exported method with full signature, classification code, and provider module), module-to-methods cross-reference (per-module method lists with consumer module tracking), classification summary, and unused exports table. **The catalog is the authoritative reference for method reuse checks — agents MUST consult it before creating any new exported function.**
-
-`constant-catalog.md` must include: constant-to-module index (every constant with kind, value/type, category code, and defining module), module-to-constants cross-reference (per-module constant lists with consumer file tracking), shared constants table (constants used by 2+ modules), and magic value report (files exceeding 5% inline-literal threshold). **The catalog is the authoritative reference for constant registration and reuse — agents MUST consult it before defining any new constant.**
-
-`terminology-glossary.md` must include: term index (auto-derived definitions with related modules and related terms), term-to-module cross-reference (per-term module context and related symbols), domain cluster map (terms grouped by co-occurrence into business domains), and terms-with-no-definition list. **The glossary is the authoritative reference for domain terminology consistency — agents MUST consult it before naming new types, functions, or concepts.**
-
-`coding-standards.md` is the **authoritative project-level coding standard**, generated by Scanner Phase F:
-
-1. Copy the matched generic standard from `framework/standards/coding-standards.<lang>.md`
-2. Prepend **§0: Project-Level Coding Standard** containing scanner-detected:
-   - §0.2 公共方法约定 — naming, verb prefixes, async patterns, error handling, parameter conventions
-   - §0.3 常量定义约定 — naming (`UPPER_SNAKE_CASE`), type preference (`enum` vs `as const`), location (`src/shared/constants/`), string prefixes, magic value tolerance
-   - §0.4 文件组织约定 — directory/file naming, barrel exports, test co-location, feature structure
-   - §0.5 编码风格约定 — indentation, quotes, semicolons, function style, import ordering, null handling, line width
-3. For each generic rule, apply merge action:
-   - **confirm:** Matches project → keep, annotate "✓ confirmed"
-   - **override:** Project differs → **REPLACE** with project convention, annotate "⚠ project standard overrides"
-   - **add:** Project-specific convention → add as **mandatory rule**, annotate "⬢ project-specific"
-4. Append mandatory footer: project standard takes precedence over generic rules
-
-**All downstream agents MUST load `docs/coding-standards.md` §0 as their primary coding reference.** Generic language standards apply only where §0 is silent.
-
-### Step 0.6: Validate Documentation
-Cross-validation checks (any ERROR halts Phase 0):
-- V-01: Every source file appears in module-map.md (ERROR)
-- V-02: Every module in module-map.md appears in architecture.md §2 (ERROR)
-- V-03: All MOD-XXX IDs unique (ERROR)
-- V-04: File count matches scan count (ERROR)
-- V-05: Module count matches inventory (ERROR)
-- V-07: No module claims 0 files (ERROR, unless empty)
-- V-09: All referenced standards files exist (ERROR)
-- V-06/V-08/V-10: Dependency count, bidirectional edges, ASCII diagrams (WARNING)
-- V-11: Every module has at least 3 keyword tags (WARNING)
-- V-12: Every module has at least 1 functional capability label (WARNING)
-- V-13: Keyword index in module-map.md covers all modules (ERROR)
-- V-14: Per-module detail docs follow `module-detail.template.md` (WARNING for large projects)
-- V-15: Every exported method appears in public-method-catalog.md (ERROR)
-- V-16: Method count in public-method-catalog.md matches B.4 inventory count (ERROR)
-- V-17: Every constant appears in constant-catalog.md (ERROR)
-- V-18: Constant count in constant-catalog.md matches B.5 inventory count (ERROR)
-- V-19: Terminology glossary has at least 10 terms for non-empty projects (WARNING)
-- V-20: Domain cluster map has at least 1 cluster for projects with >=3 modules (WARNING)
-- V-21: All cross-references within catalogs are internally consistent — no dangling module IDs (ERROR)
-- V-22: Shared constants in constant-catalog.md match shared_resources cross-check (WARNING)
-
-Compile architecture violations from Step 0.4.3. Output standardized init summary.
-
-### Step 0.7: Classify Project Complexity
-| Category | Files | Modules | Behavior |
-|----------|-------|---------|----------|
-| Empty | 0 | 0 | Minimal docs, standards only |
-| Small | 1-30 | 1-5 | All details inline |
-| Medium | 31-100 | 6-15 | All inline, architecture may split sub-sections |
-| Large | 101-500 | 16-50 | Split modules to `docs/modules/MOD-XXX.md` |
-| Very Large | 500+ | 50+ | Architecture split into sub-documents |
-
-### Step 0.8: Create Lock File
-Write `docs/.framework-init.lock` as JSON with: `initialized_at`, `framework_version`, `project_name`, `language_stack`, `framework`, `organizational_pattern`, `complexity`, `source_file_count`, `module_count`, `circular_dependencies`, `architecture_violations`, `generated_docs`. This serves as init marker, project metadata card, and staleness timestamp.
-
----
-
-## Coding Standards Hierarchy
-
-All agents MUST follow a two-tier standards hierarchy. When tiers conflict, the higher tier **always** takes precedence.
-
-### Tier 1 (PRIMARY): Project-Level Coding Standard
-- **Source:** `docs/coding-standards.md` §0 — generated by Scanner Agent Phase F during initialization
-- **Content:** Public method conventions, constant definition conventions, file organization patterns, coding style conventions — all auto-detected from actual project code
-- **Authority:** Absolute. Project-level conventions override any conflicting generic rule.
-
-### Tier 2 (FALLBACK): Language-Specific Generic Standard
-| Language | Standards File |
-|----------|----------------|
-| JavaScript (ES2022+) | `framework/standards/coding-standards.javascript.md` |
-| TypeScript (5.x+) | `framework/standards/coding-standards.typescript.md` |
-| Java (17 LTS+) | `framework/standards/coding-standards.java.md` |
-| Python (3.11+) | `framework/standards/coding-standards.python.md` |
-| Other | `framework/standards/coding-standards.template.md` |
-
-Each standard covers 15 chapters. Rules apply **only where §0 does not specify otherwise**. For polyglot projects, agents load only their language's standard; SE Agent loads all when designing cross-language integration.
-
-### Resolution Rule
-```
-§0 rule exists → FOLLOW §0 (project convention)
-§0 rule absent → FOLLOW generic standard (language convention)
-§0 = "mixed" → FOLLOW generic standard, flag inconsistency for remediation
-```
-
----
-
-## Standard Lifecycle
-
-```
-Phase 1       Phase 2      Phase 3       Phase 4      Phase 5      Phase 6        Phase 7
-┌──────┐     ┌──────┐     ┌───────┐     ┌──────┐     ┌──────┐     ┌────────┐     ┌──────────┐
-│ PRD  │ ──▶ │  SE  │ ──▶ │ Story │ ──▶ │ Test │ ──▶ │ Dev  │ ──▶ │ Code   │ ──▶ │Validation│
-│Input │     │Design│     │Design │     │ Plan │     │Coding│     │Review  │     │ (Plugin) │
-└──────┘     └──────┘     └───────┘     └──────┘     └──────┘     └────────┘     └──────────┘
-    │            │            │             │            │             │                │
-    ▼            ▼            ▼             ▼            ▼             ▼                ▼
-  PRD.md     SE Design   Dev Story     Test Plan    Source Code   Review Report   Pass/Fail
-  (User)     (SE Agent)  (Dev Agent)   (Test Agent) (Dev Agent)   (SE Agent)     (Plugin)
-                                                                      │
-                                                       APPROVED → Phase 7
-                                                       CHALLENGED → back to Phase 5
-```
-
-### Shortcut Path
-```
-User provides dev-story.md
-         │
-         ├── Test Plan missing ──▶ Phase 4 (Test Plan) → Phase 5 → Phase 6 → Phase 7
-         ├── Test Plan exists  ──▶ Phase 5 (Dev Coding) → Phase 6 → Phase 7
-         └── Code written      ──▶ Phase 6 (Code Review) → Phase 7
-```
-
-### Phase Details
-
-All paths are relative to the requirement directory `docs/requirements/REQ-YYYY-NNN-{slug}/`.
-
-| Phase | Agent | Input | Artifact | Report | Template | Reviewer |
-|-------|-------|-------|----------|--------|----------|----------|
-| 1. PRD | User | Business needs | `prd.md` | `reports/phase-1-prd-report.md` | `framework/artifacts/prd.template.md` | — |
-| 2. SE Design | SE Agent | PRD, architecture docs | `se-design.md` | `reports/phase-2-se-design-report.md` | `framework/artifacts/se-design.template.md` | Dev Agent |
-| 3. Story Design | Dev Agent | SE Design, PRD | `dev-story.md` | `reports/phase-3-story-design-report.md` | `framework/artifacts/dev-story.template.md` | SE Agent |
-| 4. Test Plan | Test Agent | PRD, SE Design, Dev Story | `test-plan.md` | `reports/phase-4-test-plan-report.md` | `framework/artifacts/test-plan.template.md` | Dev Agent + User |
-| 5. Dev Coding | Dev Agent | Dev Story, Test Plan | Source code | `reports/phase-5-dev-coding-report.md` | Language-specific standards | SE Agent (Phase 6) |
-| 6. Code Review | SE Agent | Source code, Dev Story, PRD, Test Plan | Review Report | `reports/phase-6-code-review-report.md` | §Code Review Checklist | — (gate to Phase 7) |
-| 7. Validation | Test Agent | Source code, Test Plan, Review Report | `validation-report.md` | `reports/phase-7-validation-report.md` | `framework/standards/validation-standards.template.md` | — |
-
-Each phase produces TWO output files within the requirement directory: the primary artifact and a phase completion report.
-
-### Phase Transition Rules
-1. Before each transition, check plugin hooks and pending challenges
-2. A phase is complete only when quality gate is satisfied AND reviewer accepts
-3. No phase skipping in full lifecycle; shortcut has defined entry points
-4. **Phase 6 is a hard gate** — Phase 7 cannot begin until review is APPROVED
-
-### State Tracking
-**Tier 0 — Init Gate:** `docs/.framework-init.lock` absent = ALL lifecycle requests rejected.
-
-**Tier 1 — Requirement State:** Tracked per-requirement via `docs/requirements/index.md`. Each REQ row records its current phase and status.
-
-**Tier 2 — Phase State** (tracked via artifact + report within the requirement directory):
-| Artifact | Report | Indicates |
-|----------|--------|-----------|
-| `prd.md` | `reports/phase-1-prd-report.md` | Phase 1 complete |
-| `se-design.md` | `reports/phase-2-se-design-report.md` | Phase 2 complete |
-| `dev-story.md` | `reports/phase-3-story-design-report.md` | Phase 3 complete (or shortcut entry) |
-| `test-plan.md` | `reports/phase-4-test-plan-report.md` | Phase 4 complete |
-| Git commit with source changes | `reports/phase-5-dev-coding-report.md` | Phase 5 complete |
-| `reports/phase-6-code-review-report.md` with APPROVED | — | Phase 6 complete |
-| `validation-report.md` | `reports/phase-7-validation-report.md` | Phase 7 complete |
-
-**Tier 3 — Challenge State:** Tracked via `docs/challenges/index.md` — any OPEN challenge blocks phase transition for its requirement.
-
-### Phase Completion Reports (MANDATORY)
-
-Every phase MUST generate a phase report within the requirement's `reports/` directory. The report documents what happened during execution and serves as the quality gate record for phase transition.
-
-**Report path:** `docs/requirements/REQ-YYYY-NNN-{slug}/reports/phase-{N}-{phase-name}-report.md`
-
-**Report format:**
-```markdown
-# Phase {N} Report: {Phase Name}
-- **Report ID:** PH{N}-YYYY-NNN | **Date:** YYYY-MM-DD HH:MM
-- **Agent:** {Agent Name} | **Status:** COMPLETED | CHALLENGED | FAILED
-
-## Input Artifacts
-| Artifact | Path | Status |
-|----------|------|--------|
-| PRD | docs/prd.md | ✓ Present |
-| ... | ... | ... |
-
-## Execution Summary
-- **Steps executed:** N
-- **Decisions made:** (list key design/implementation decisions)
-- **Deviations:** (any deviations from template or upstream spec, with justification)
-
-## Output Artifacts
-| Artifact | Path | Lines/Size |
-|----------|------|------------|
-| ... | ... | ... |
-
-## Quality Gate
-- [ ] Output conforms to template
-- [ ] All mandatory sections populated
-- [ ] Reviewer (if applicable) has accepted
-- **Gate result:** PASS | FAIL (with reason)
-
-## Plugin Hooks Executed
-- `{phase}-pre`: executed / skipped (no hooks registered)
-- `{phase}-post`: executed / skipped
-
-## Reviewer Sign-off
-- **Reviewer:** {Name} | **Decision:** ACCEPT | CHALLENGE
-- **Challenge ID:** CH-YYYY-NNN (if challenged)
-```
-
-**Report generation rule:** The executing agent generates the report immediately after producing the primary artifact and before handoff. If a phase is re-entered (e.g., after challenge resolution), a new report is generated superseding the previous one.
-
-### Challenge Documentation (MANDATORY)
-
-Every challenge MUST be recorded as a standalone document. Per-requirement challenges live in the requirement's `challenges/` directory. The global index at `docs/challenges/index.md` aggregates all challenges across requirements.
-
-**Challenge path:** `docs/requirements/REQ-YYYY-NNN-{slug}/challenges/CH-YYYY-NNN.md` (sequential counter, padded to 3 digits)
-
-**Challenge record format:**
-```markdown
-# Challenge CH-YYYY-NNN
-- **Filed:** YYYY-MM-DD HH:MM | **Phase:** {N} {Phase Name}
-- **Challenger:** {Agent Name} | **Challenged:** {Agent Name}
-- **Status:** OPEN | RESOLVED | ESCALATED | REJECTED
-- **Resolution Date:** YYYY-MM-DD HH:MM (if resolved)
-
-## Basis
-Specific standard/clause/rule citation (e.g., "CR-3: Standards Compliance — coding-standards.typescript.md §4.2")
-
-## Evidence
-[File path:line — concrete example of the violation]
-
-## Impact
-[What breaks, what risks are introduced, what downstream phases are affected]
-
-## Suggested Fix
-[Specific remediation steps]
-
-## Resolution
-- **Resolved by:** {Agent Name} | **Date:** YYYY-MM-DD HH:MM
-- **Changes made:** [Summary of what changed]
-- **Verification:** [How the fix was verified]
-- **Re-review result:** PASS | FAIL
-```
-
-**Challenge lifecycle:**
-1. Challenger creates the challenge record in the requirement's `challenges/` directory with status OPEN
-2. Challenged agent reviews, implements fix, updates Resolution section → status RESOLVED
-3. Challenger verifies fix → if accepted, close; if rejected, status returns to OPEN with explanation
-4. If deadlocked after 2 rounds → status ESCALATED, user decides
-5. Invalid challenges (no cited basis) → status REJECTED with explanation
-6. On every status change, update both the challenge record AND `docs/challenges/index.md`
-
-**Challenge index:** Maintain `docs/challenges/index.md` as a global table across all requirements:
-```markdown
-# Challenge Index
-| ID | REQ ID | Phase | Filed | Challenger | Challenged | Basis | Status | Resolution Date |
-|----|--------|-------|-------|------------|------------|-------|--------|-----------------|
-| CH-2026-001 | REQ-2026-001 | 6 | 2026-06-06 | SE Agent | Dev Agent | CR-2 | RESOLVED | 2026-06-06 |
-```
-
----
-
-## Phase 6: Code Review (代码审核)
-
-Mandatory hard gate. SE Agent is reviewer. Any FAIL triggers a challenge against Dev Agent.
-
-### Checklist (8 items)
-
-**CR-1: Requirement Completeness** — Every FR in PRD/Dev Story implemented; every AC in test plan addressed; no TODO/FIXME/stubs.
-  Challenge basis: cite FR-XXX or AC-XXX missing/incomplete.
-
-**CR-2: Dev Story Alignment** — Every task implemented; file paths, signatures, structures match Dev Story; deviations documented.
-  Challenge basis: cite TASK-XXX misaligned.
-
-**CR-3: Standards Compliance** — Follows language-specific standards; consistent naming; correct file organization; no prohibited patterns.
-  Challenge basis: cite standards chapter/section violated.
-
-**CR-4: Architectural Integrity** — No circular dependencies; module rules respected; proper encapsulation; aligns with `docs/architecture.md`.
-  Challenge basis: cite architecture.md section or dependency rule violated.
-
-**CR-5: Correctness** — All code paths reachable; error handling complete; edge cases handled; no race conditions.
-  Challenge basis: cite unhandled error scenario from Dev Story §5 or SE Design §3.1.6.
-
-**CR-6: Test Coverage** — All new functions tested; Arrange-Act-Assert pattern; happy/error/boundary paths covered; no regressions.
-  Challenge basis: cite missing/failing test case from test plan.
-
-**CR-7: Security** — No hardcoded secrets; input validated at boundary; injection vectors closed; no `eval()`.
-  Challenge basis: cite security standard from coding standards §Security.
-
-**CR-8: No Omissions** — No commented-out code; no empty catch; no unreachable code; no debug leftovers; no dead imports.
-  Challenge basis: cite file + line with omission.
-
-### Review Flow
-```
-Phase 5 → SE Agent reviews → ALL PASS → APPROVED → Phase 7
-                           → ANY FAIL → Challenge → Dev fixes → re-review → repeat
-                           → Same item fails twice → Escalate to User
-```
-
-### Report Format
-```markdown
-# Code Review Report
-- **Review ID:** CR-YYYY-NNN | **Reviewer:** SE Agent | **Date:** YYYY-MM-DD
-
-## Summary
-- Passed: N / Failed: N / Overall: APPROVED | CHALLENGED
-
-## Checklist Results
-### CR-X: Name — PASS/FAIL
-- Issue / Basis / Impact / Suggested Fix (if FAIL)
-
-## Resolution
-- [ ] All FAIL items resolved → Proceed to Phase 7
-```
-
----
-
 ## Framework Rules (priority order)
+
+All detailed rules are in `framework/workflows/`. The orchestrator loads them in priority order:
 
 | Priority | Rule File | Purpose |
 |----------|-----------|---------|
 | 0 | `framework/workflows/challenge-mechanism.rule.md` | Challenge/audit — highest priority |
 | 1 | `framework/workflows/plugin-extension.rule.md` | Plugin hooks — checked before each step |
-| 2 | `framework/workflows/standard-lifecycle.rule.md` | 7-phase workflow + shortcut |
-| 3 | `framework/standards/coding-standards.<lang>.md` | Language-specific standards |
-| 4 | `framework/standards/project-structure.template.md` | Project structure spec |
-| 5 | `framework/standards/validation-standards.template.md` | Process validation spec |
+| 2 | `framework/workflows/ux-constraint.rule.md` | UX constraint enforcement — blocks phases when UI design involved |
+| 3 | `framework/workflows/standard-lifecycle.rule.md` | 7-phase workflow + shortcut + Phase 5.5/6.5 catalog gates |
+| 4 | `framework/workflows/execution-protocol.rule.md` | 9-step execution sequence for every lifecycle run |
+| 5 | `framework/workflows/initialization.rule.md` | Phase 0 protocol — language detection, scanning, doc generation, lock |
+| 6 | `framework/workflows/requirement-model.rule.md` | Requirement directory model, REQ-ID assignment, lifecycle tracking |
+| 7 | `framework/workflows/coding-standards-hierarchy.rule.md` | Two-tier standards hierarchy + §0.6 UX规范约定 |
+| 8 | `framework/standards/coding-standards.<lang>.md` | Language-specific standards (JS/TS/Java/Python) |
+| 9 | `framework/standards/project-structure.template.md` | Project structure spec |
+| 10 | `framework/standards/validation-standards.template.md` | Process validation spec |
 
 ---
 
@@ -506,204 +87,107 @@ Phase 5 → SE Agent reviews → ALL PASS → APPROVED → Phase 7
 
 | Skill File | Agent | Role |
 |-------------|-------|------|
-| `framework/agents/project-scanner.skill.md` | Scanner Agent | Project structure scanning, module mapping, shared resource detection, dependency analysis |
-| `framework/agents/se-agent.skill.md` | SE Agent | Architecture design, SE requirements, Code Review |
-| `framework/agents/dev-agent.skill.md` | Dev Agent | Story design, coding, challenge resolution |
+| `framework/agents/project-scanner.skill.md` | Scanner Agent | Project scanning, module mapping, shared resource detection, dependency analysis, UX convention detection |
+| `framework/agents/se-agent.skill.md` | SE Agent | Architecture design, SE requirements, Code Review (CR-1~CR-8), UX architecture validation |
+| `framework/agents/ux-agent.skill.md` | UX Agent | UX Specification Extraction (Phase 2.6), UX Compliance Review (CR-9), UX constraint validation, CAT-3 challenges |
+| `framework/agents/dev-agent.skill.md` | Dev Agent | Story design, coding, challenge resolution, UX implementation per §0.6 and UX Spec |
 | `framework/agents/test-agent.skill.md` | Test Agent | Test planning, process validation |
+
+---
+
+## Phase Reference
+
+| Phase | Agent | Input | Artifact | Report | Template | Reviewer |
+|-------|-------|-------|----------|--------|----------|----------|
+| 1. PRD | User | Business needs | `prd.md` | `reports/phase-1-prd-report.md` | `framework/artifacts/prd.template.md` | — |
+| 2. SE Design | SE Agent | PRD, architecture docs | `se-design.md` | `reports/phase-2-se-design-report.md` | `framework/artifacts/se-design.template.md` | Dev Agent |
+| **2.6 UX Spec** | **UX Agent** | **PRD §5.4, SE Design §4.5, UX guidelines** | **`ux-spec.md`** | **`reports/phase-2.6-ux-spec-report.md`** | **`framework/artifacts/ux-spec.template.md`** | **Dev Agent** |
+| 3. Story Design | Dev Agent | SE Design, PRD, UX Spec (if UI) | `dev-story.md` | `reports/phase-3-story-design-report.md` | `framework/artifacts/dev-story.template.md` | SE Agent + UX Agent |
+| 4. Test Plan | Test Agent | PRD, SE Design, Dev Story | `test-plan.md` | `reports/phase-4-test-plan-report.md` | `framework/artifacts/test-plan.template.md` | Dev Agent + User |
+| 5. Dev Coding | Dev Agent | Dev Story, Test Plan, UX Spec (if UI) | Source code | `reports/phase-5-dev-coding-report.md` | Language-specific standards + §0.6 | SE Agent (CR 1~8), UX Agent (CR-9) |
+| 5.5 Catalog Self-Check | Dev Agent | Code diff, catalogs | Self-check in Phase 5 Report | (embedded) | `standard-lifecycle.rule.md` §5.5 | — |
+| 6. Code Review | SE Agent + UX Agent | Code, Dev Story, PRD, Test Plan, UX Spec | Review Report | `reports/phase-6-code-review-report.md` | 9-item checklist (CR-1~CR-9) | — (gate to Phase 7) |
+| 6.5 Catalog Verification | SE Agent | Code diff, catalogs, Phase 5 Report | Verification in Phase 6 Report | (embedded) | `standard-lifecycle.rule.md` §6.5 | — |
+| 7. Validation | Test Agent | Code, Test Plan, Review Report | `validation-report.md` | `reports/phase-7-validation-report.md` | `framework/standards/validation-standards.template.md` | — |
+
+**Key gates:** Phase 0 lock → Phase 2.6 UX Spec Extraction (if UI) → Phase 5.5 catalog self-check → Phase 6 (CR-1~CR-9 checklist) → Phase 6.5 catalog consistency → Phase 7 validation. See `framework/workflows/standard-lifecycle.rule.md` for full phase details.
+
+### UX Specification & Review Gates (Conditional — only when project has UI)
+
+When the project has UI (`docs/.framework-init.lock` → `ui_stack.has_ui: true`), UX-specific phases and gates activate. **The UX Agent extracts requirements from existing design artifacts — it does NOT create designs.**
+
+| Gate | Phase | What | Reviewer | Rule |
+|------|-------|------|----------|------|
+| UX-C01 | 1→2 | PRD must include §5.4 UX Constraints (UX-01 to UX-05) | SE Agent | `ux-constraint.rule.md` |
+| UX-C02 | 2→2.6 | SE Design must include §4.5 UI Architecture | UX Agent | `se-design.template.md` |
+| UX-S01 | **2.6** | **UX Requirements Specification extracted** (from PRD, design files, SE Design — no invention) | **Dev Agent** | **`ux-agent.skill.md`** |
+| UX-C03 | 3→4 | Dev Story UI tasks have UX spec coverage (UX-S-01~UX-S-04) | UX Agent | `ux-constraint.rule.md` |
+| UX-R01 | **6 (CR-9)** | **UX Spec Compliance Review: checks code against extracted spec only** | **UX Agent → Dev Agent** | **`standard-lifecycle.rule.md` §CR-9** |
 
 ---
 
 ## Directory Structure
 
 ```
-H5LifecycleTemplate/
-├── CLAUDE.md                              # Master orchestrator
+project/
+├── CLAUDE.md                              # Master orchestrator (this file)
 ├── .claude/settings.json                  # Harness settings
 ├── framework/
-│   ├── agents/                            # project-scanner, se-agent, dev-agent, test-agent .skill.md
-│   ├── workflows/                         # standard-lifecycle, challenge-mechanism, plugin-extension .rule.md
-│   ├── artifacts/                         # prd, se-design, dev-story, test-plan, architecture-doc, module-detail .template.md
+│   ├── agents/                            # project-scanner, se-agent, ux-agent, dev-agent, test-agent .skill.md
+│   ├── workflows/                         # 8 rule files (challenge, plugin, ux-constraint, lifecycle, execution, init, requirement-model, coding-standards-hierarchy)
+│   ├── artifacts/                         # prd, se-design, ux-spec, dev-story, test-plan, architecture-doc, module-detail .template.md + catalog templates
 │   └── standards/                         # coding-standards (js/ts/java/python/template), project-structure, validation-standards
-├── plugins/                               # Plugin extensions (example-plugin/)
+├── plugins/                               # Plugin extensions
 └── docs/                                  # Generated documentation
     ├── .framework-init.lock               # Init marker + project metadata (JSON)
-    ├── architecture.md                    # Shared — project architecture (Phase 0)
-    ├── module-map.md                      # Shared — file-to-module map (Phase 0)
-    ├── coding-standards.md                # Shared — language standards (Phase 0)
-    ├── project-structure.md               # Shared — directory conventions (Phase 0)
-    ├── public-method-catalog.md           # Shared — exported method inventory (Phase 0)
-    ├── constant-catalog.md                # Shared — constants inventory (Phase 0)
-    ├── terminology-glossary.md            # Shared — domain terminology (Phase 0)
-    ├── .scanner-report.json               # Shared — machine-readable scan data (Phase 0)
+    ├── architecture.md                    # Shared — project architecture
+    ├── module-map.md                      # Shared — file-to-module map + keyword index
+    ├── coding-standards.md                # Shared — §0 project-level + language standards
+    ├── project-structure.md               # Shared — directory conventions
+    ├── ux-guidelines.md                   # Shared — UX guidelines (if UI detected)
+    ├── public-method-catalog.md           # Shared — exported method inventory
+    ├── constant-catalog.md                # Shared — constants inventory
+    ├── terminology-glossary.md            # Shared — domain terminology
+    ├── .scanner-report.json               # Shared — machine-readable scan data
     ├── challenges/
-    │   └── index.md                       # Global challenge index (all requirements)
-    ├── modules/                           # Per-module docs (large projects, Phase 0)
-    │   └── MOD-XXX.md
+    │   └── index.md                       # Global challenge index
+    ├── modules/                           # Per-module docs (large projects)
     └── requirements/                      # Requirement directory root
         ├── index.md                       # Requirement registry
         └── REQ-YYYY-NNN-{slug}/           # Isolated requirement directory
             ├── prd.md                     # Phase 1 artifact
             ├── se-design.md               # Phase 2 artifact
+            ├── ux-spec.md                 # Phase 2.6 artifact (if UI) — extracted UX requirements
             ├── dev-story.md               # Phase 3 artifact
             ├── test-plan.md               # Phase 4 artifact
             ├── validation-report.md       # Phase 7 artifact
-            ├── reports/                   # Phase completion reports (this req only)
-            │   ├── phase-1-prd-report.md
-            │   ├── phase-2-se-design-report.md
-            │   ├── phase-3-story-design-report.md
-            │   ├── phase-4-test-plan-report.md
-            │   ├── phase-5-dev-coding-report.md
-            │   ├── phase-6-code-review-report.md
-            │   └── phase-7-validation-report.md
-            └── challenges/                # Challenge records (this req only)
-                └── CH-YYYY-NNN.md
+            ├── reports/                   # Phase completion reports
+            └── challenges/                # Challenge records
 ```
 
 ---
 
-## Execution Protocol
+## Execution Summary
 
-### 1. Determine Operating Mode
-- No lock file → REJECT, instruct `@CLAUDE.md 初始化框架`
-- Lock + re-init command → confirm, delete lock, re-run Phase 0
-- Lock >30 days → warn, suggest re-init
-- Lock + Dev Story → Entry B (Shortcut)
-- Lock + PRD/default → Entry A (Full Lifecycle)
-
-### 2. Create Requirement Directory
-When starting a new lifecycle (Entry A or B for a new requirement):
-1. Assign the next REQ-ID from `docs/requirements/index.md` (or REQ-YYYY-001 if first)
-2. Derive slug from PRD title or Dev Story name
-3. Create `docs/requirements/REQ-YYYY-NNN-{slug}/` with `reports/`, `challenges/` subdirectories
-4. Register the requirement in `docs/requirements/index.md` with status ACTIVE, current phase = 1
-5. All subsequent phases for this requirement write into this directory
-
-### 3. Load Environment
-Read `docs/architecture.md`, `docs/module-map.md` (including the keyword-to-module index), `docs/public-method-catalog.md` (for method reuse checks), `docs/constant-catalog.md` (for constant reuse and registration), and `docs/terminology-glossary.md` (for domain term consistency). Load coding standards, scan `plugins/` for hooks, verify framework rules accessible. Identify the current requirement directory. For code-level work:
-- Consult the keyword index in module-map.md to locate relevant modules and their capabilities.
-- Check public-method-catalog.md for existing methods before writing new functions.
-- Check constant-catalog.md for existing constants before defining new ones.
-- Check terminology-glossary.md to use consistent domain terminology.
-
-### 4. Pre-Flight Checks
-Resolve pending challenges for this requirement first. Execute `*-pre` plugin hooks. Validate input artifacts against templates.
-
-**Catalog compliance pre-check:** Verify `docs/public-method-catalog.md`, `docs/constant-catalog.md`, and `docs/terminology-glossary.md` exist and are readable. If any catalog is missing (first run or corrupted), treat as WARNING — agents proceed but MUST self-declare new symbols in the phase report for future catalog inclusion.
-
-### 5. Execute Current Phase
-Load agent skill file → provide inputs/standards/architecture → agent produces primary artifact in the requirement directory → **agent performs proactive challenge check** (scan for CAT-1 requirement gaps and CAT-2 standards violations) → if issues found, raise challenges immediately → agent generates phase completion report in `{req-dir}/reports/` → run `*-post` hooks → validate output against template.
-
-**Phase report is MANDATORY.** A phase is not complete until its report is written. If the phase produces no report, the orchestrator MUST NOT advance.
-
-**Proactive challenge rule:** Agents MUST scan for CAT-1 and CAT-2 issues before declaring their phase complete. Issues found during execution should be raised as challenges immediately — do not wait for a downstream review phase to catch them. This is the framework's primary self-correction mechanism.
-
-**Challenge blocking rule:** If any proactive challenge (CAT-1, CAT-2, CAT-2a/2b/2c) is raised during this phase, the phase status becomes CHALLENGED. The phase report MUST list all challenges raised with their CH-YYYY-NNN IDs. Phase transition is BLOCKED until all challenges are RESOLVED. The orchestrator MUST NOT advance to the next phase while any OPEN challenge exists against the current requirement.
-
-### 6. Handoff or Halt
-Reviewer accepts → advance phase, update `docs/requirements/index.md` current phase. Reviewer challenges → **create challenge record** in `{req-dir}/challenges/CH-YYYY-NNN.md`, update `docs/challenges/index.md`, pause lifecycle, route to challenged agent. Validation fails → return for revision.
-
-**Catalog violation blocking:** If the phase produced new public methods, constants, or terminology symbols without declaring them in the phase report's "New Symbol Declaration" section → REJECT handoff → return to agent for declaration → re-execute phase. Phase 5.5 and Phase 6.5 catalog gates are mandatory — skipping them constitutes a CAT-2 violation and blocks phase transition.
-
-### 7. Challenge Resolution
-Challenged agent reads challenge record → implements fix → updates challenge Resolution section → sets status RESOLVED. Challenger verifies and closes or re-opens. Every round is appended to the challenge record. After resolution, the phase that triggered the challenge is re-executed and a new phase report is generated.
-
-### 8. Code Review Gate (before Phase 7)
-Invoke SE Agent in Code Review mode → execute 8-item checklist → APPROVED → Phase 7; CHALLENGED → create challenge record → fix → re-review; twice-failed → escalate.
-
-### 9. Completion
-When Phase 7 passes: mark requirement COMPLETED in `docs/requirements/index.md`. Report: phases completed, files changed/created, test results, review status. All artifacts, reports, and challenges are self-contained in the requirement directory.
+1. **Determine mode:** Check lock → Entry A (full) or Entry B (shortcut) or reject
+2. **Create requirement dir:** Assign REQ-ID, create directory, register in index
+3. **Load environment:** Architecture, module map, catalogs, UX guidelines (if UI), standards, plugins
+4. **Pre-flight:** Resolve pending challenges, run pre-hooks, validate inputs, **check UX constraints if UI**
+5. **Execute phase:** Agent produces artifact + phase report → proactive challenge scan → post-hooks
+6. **UX Spec Extraction (conditional):** If project has UI, UX Agent extracts UX requirements from existing design artifacts into UX Specification (does not design)
+7. **Handoff/Halt:** Accept → advance phase; Challenge → create challenge record, block transition
+8. **Challenge resolution:** Fix → re-execute phase → re-review
+9. **Code review gate:** CR-1~CR-8 (SE Agent) + CR-9 UX Review (UX Agent if UI) → APPROVED → Phase 7
+10. **Completion:** Phase 7 passes → mark requirement COMPLETED
 
 ---
 
-## Challenge Mechanism Summary
+## Key Principles
 
-Detailed rules in `framework/workflows/challenge-mechanism.rule.md`. Highest priority. **Challenges are the framework's primary iteration mechanism** — agents are expected to raise challenges proactively, not just react to them.
-
-### Challenge as Iteration Driver
-
-The framework treats challenges as a positive, expected behavior — not a failure signal. Every agent MUST actively look for issues during their work and raise challenges when found. This creates a self-correcting development loop.
-
-```
-Agent executes phase → discovers issue → raises challenge → challenged agent fixes → re-execute → advances
-                                              ↑
-                               Proactive detection (REQ gaps, standards violations)
-```
-
-### Two Proactive Challenge Categories
-
-#### CAT-1: Requirement Gap Challenge (需求遗漏)
-Raised when an agent discovers a functional requirement is missing, incomplete, or contradictory.
-
-**Trigger conditions:**
-- PRD references a feature without specifying behavior → challenge against PRD author
-- SE Design omits a module needed to fulfill a PRD requirement → SE Agent vs PRD
-- Dev Story task list misses a necessary implementation step → Dev Agent vs SE Agent
-- Test Plan has no test case for a documented requirement → Test Agent vs Dev Agent
-- Code implements a feature not documented in any upstream artifact → SE Agent vs Dev Agent (Phase 6)
-
-**Challenge format for REQ gaps:**
-```
-Basis: "FR-XXX specifies {feature} but no corresponding {code/design/test} exists"
-Evidence: Missing artifact reference + impacted downstream phases
-Impact: {what breaks if this gap is not closed}
-Suggested Fix: "Add {artifact} covering {requirement}"
-```
-
-#### CAT-2: Standards Violation Challenge (编码规范违反)
-Raised when an agent discovers code or design that violates the project's coding standards.
-
-**Trigger conditions:**
-- Scanner detects file naming/organization inconsistent with `docs/coding-standards.md` §0 → Scanner vs Dev Agent
-- SE Design specifies a module structure violating `docs/project-structure.md` → Dev Agent vs SE Agent
-- Code uses prohibited patterns from standards "禁止事项" → any agent vs Dev Agent
-- Code organization doesn't follow detected conventions (Phase F) → Scanner/SE Agent vs Dev Agent
-- New file placed in wrong directory per module organization rules (§7.4) → any agent vs Dev Agent
-- New exported method duplicates existing function in `docs/public-method-catalog.md` (MUST-01) → CAT-2a challenge
-- New shared constant not registered in `docs/constant-catalog.md` Shared Constants table (MUST-05) → CAT-2b challenge
-- Constant not following unified naming or centralized storage rules (MUST-06) → any agent vs Dev Agent
-- Inline magic value found in business logic without extraction to named constant (MUST-07) → any agent vs Dev Agent
-- New constant defined without consulting `docs/constant-catalog.md` for existing equivalents (MUST-08) → any agent vs Dev Agent
-- New type/interface/function name inconsistent with `docs/terminology-glossary.md` (MUST-09, MUST-10) → CAT-2c challenge
-- New domain concept not registered in `docs/terminology-glossary.md` (MUST-11) → Dev Agent vs self or SE Agent vs Dev Agent
-
-**Challenge format for standards violations:**
-```
-Basis: "coding-standards.<lang>.md §X.Y: {rule} — {violation description}"
-Evidence: file:line with actual vs expected
-Impact: {maintainability risk, inconsistency with rest of codebase}
-Suggested Fix: "Change {X} to {Y} per standard §X.Y"
-```
-
-### Challenge Rules
-1. Any agent can challenge another's output by citing specific standard/clause violation
-2. Challenged agent MUST stop and resolve challenge first
-3. Valid challenge requires: target, basis (specific citation), evidence, impact, suggested fix
-4. Invalid challenges (no cited basis, personal preference) are rejected
-5. Deadlocked challenges escalate to user
-6. Code Review challenges (Phase 6) are system-generated from the 8-item checklist
-7. **Proactive challenges (CAT-1, CAT-2) are expected and encouraged** — agents should raise them immediately upon discovery, not wait for a review phase
-
-**Challenge documentation (MANDATORY):**
-- Every challenge is recorded in the requirement's `challenges/CH-YYYY-NNN.md` using the format defined in §Challenge Documentation
-- `docs/challenges/index.md` (global) is updated on every challenge state change
-- No phase transition is allowed while an OPEN challenge exists against that requirement
-- Challenge records are permanent artifacts — never deleted, only status-updated
-- Challenge category (CAT-1/CAT-2) must be recorded in the challenge document
-
-## Plugin Extension Summary
-
-Detailed rules in `framework/workflows/plugin-extension.rule.md`. 12 hook points:
-
-| Hook | Trigger | Type |
-|------|---------|------|
-| `prd-post` | After PRD provided | Post |
-| `se-pre` / `se-post` | Before/after SE Design | Pre/Post |
-| `story-pre` / `story-post` | Before/after Story Design | Pre/Post |
-| `test-pre` / `test-post` | Before/after Test Plan | Pre/Post |
-| `dev-pre` / `dev-post` | Before/after Development | Pre/Post |
-| `review-pre` / `review-post` | Before/after Code Review | Pre/Post |
-| `validation-post` | After Validation passes | Post |
-
----
-
-The framework is language-agnostic at its core. Language-specific standards (JS, TS, Java, Python) are pre-built; other languages are generated during Phase 0 from the generic template.
+- **Challenges are the primary iteration mechanism** — agents must proactively raise CAT-1 (requirement gaps), CAT-2 (standards violations), and CAT-3 (UX violations) challenges during their work, not wait for review phases
+- **Catalog integrity is mandatory** — agents must consult `public-method-catalog.md`, `constant-catalog.md`, and `terminology-glossary.md` before creating new symbols; Phase 5.5 and 6.5 gates enforce this
+- **Project standards take precedence** — `docs/coding-standards.md` §0 overrides all generic language standards when they conflict; §0.6 (UX规范约定) applies to all UI work
+- **UX is a first-class quality gate** — when `ui_stack.has_ui` is true, UX Specification (Phase 2.6) extracts requirements from existing designs, and UX Spec Compliance Review (CR-9) validates implementation before Phase 7. UX Agent does NOT design — it extracts and enforces
+- **UX constraints are mandatory for UI projects** — PRD and Dev Story phases involving UI design are blocked until UX constraints are fulfilled
+- **Phase reports are MANDATORY** — no phase is complete without its report; no phase transition without report
+- **The lock file is the gatekeeper** — no lifecycle execution without `docs/.framework-init.lock`

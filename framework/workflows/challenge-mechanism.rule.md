@@ -89,14 +89,19 @@ Challenges can occur at these handoff points:
 
 | Phase Transition | Potential Challenger | Potential Target | Common Challenge Topics |
 |-----------------|---------------------|-----------------|------------------------|
-| PRD → SE Design | SE Agent | User | PRD ambiguity, missing requirements |
+| PRD → SE Design | SE Agent | User | PRD ambiguity, missing requirements, missing UX constraints |
+| SE Design → UX Spec | UX Agent | SE Agent | UI architecture incomplete, component tree missing |
+| UX Spec → Story Design | Dev Agent | UX Agent | UX Spec contradicts framework capabilities or is too vague |
 | SE Design → Story | Dev Agent | SE Agent | Unimplementable design, missing interfaces |
 | Story → Test Plan | Test Agent | Dev Agent | Untestable story, missing edge cases |
 | SE Design ← Story | SE Agent | Dev Agent | Story deviates from design |
+| UX Spec ← Story | UX Agent | Dev Agent | UI tasks lack UX specification coverage |
 | Test Plan → Dev | Dev Agent | Test Agent | Invalid test criteria, impossible test cases |
-| Dev → Code Review | SE Agent (system-generated) | Dev Agent | **8-item checklist failures:** missing requirements, dev story misalignment, standards violations, architectural issues, correctness bugs, missing tests, security issues, code omissions |
+| Dev → Code Review | SE Agent (system-generated) | Dev Agent | **8-item checklist failures (CR-1~CR-8)** |
+| Dev → UX Review | UX Agent (system-generated) | Dev Agent | **CAT-3: CR-9 UX Spec compliance failures** |
 | Code Review → Validation | Test Agent | Dev Agent | Post-review issues found during validation |
 | Code Review → Validation | Test Agent | SE Agent | Code review missed issues now found in validation |
+| Code Review → Validation | UX Agent | Dev Agent | UX issues found during validation |
 | Any → Any | Any Agent | User (plugin owner) | Plugin hook produces incorrect/harmful modifications |
 
 ## Code Review Challenges (special case)
@@ -161,6 +166,69 @@ CAT-2a/2b/2c raised
 ```
 
 **Escalation rule:** If the same catalog compliance issue is challenged twice without resolution → immediate escalation. Catalog integrity is critical for long-term project maintainability.
+
+### CAT-3: UX Specification Violation Challenge (UX规范违反)
+
+Challenge category for code deviations from the extracted UX Requirements Specification. The UX Agent does NOT design — it extracts requirements from existing design artifacts. CAT-3 challenges can ONLY cite violations of explicitly stated UX Specification items.
+
+**Trigger conditions:**
+- UI component visual states deviate from UX Spec §2 extracted requirements → UX Agent vs Dev Agent
+- Interaction behavior doesn't match UX Spec §3 extracted requirements → UX Agent vs Dev Agent
+- Responsive layout breaks at UX Spec §4 specified breakpoints → UX Agent vs Dev Agent
+- Accessibility requirements extracted in UX Spec §5 not met → UX Agent vs Dev Agent
+- Hardcoded styles instead of design tokens per UX Spec §6 mapping → UX Agent vs Dev Agent
+- Missing UX states per UX Spec §2 state requirements → UX Agent vs Dev Agent
+- Animation/transition doesn't match UX Spec extracted requirements → UX Agent vs Dev Agent
+- Component uses wrong variant or size per UX Spec requirements → UX Agent vs Dev Agent
+- Dev Story UI tasks lack UX Specification coverage → UX Agent vs Dev Agent (Phase 3)
+
+**Invalid CAT-3 challenges (REJECTED):**
+- Challenge based on personal aesthetic preference without UX Spec citation
+- Challenge for a UI aspect not covered by the UX Specification ("not specified" = out of scope)
+- Challenge that invents requirements the user never provided ("UX Agent thinks it should look different")
+
+**Challenge format for CAT-3:**
+```
+Basis: "UX Spec §X.Y: {extracted requirement} — {deviation description}"
+       OR
+       "docs/coding-standards.md §0.6.Y: {UX convention} — {deviation description}"
+Evidence: file:line with actual vs expected (include visual diff description when applicable)
+Impact: {user experience degradation / accessibility barrier / design inconsistency}
+Suggested Fix: "Change {X} to {Y} per UX Spec §Z"
+```
+
+**Detection timing:**
+- Phase 2.6 UX Spec Extraction: UX Agent flags gaps in SE Design UI architecture against UX guidelines
+- Phase 3 Story Design: UX Agent reviews Dev Story UI tasks for UX spec coverage
+- Phase 6 Code Review: UX Agent executes CR-9 checklist (UX Specification Compliance)
+- Phase 7 Validation: UX Agent verifies final UI output meets spec
+
+**Challenged party:** Dev Agent (implementation), SE Agent (UI architecture gaps), or PRD author (missing UX constraints)
+
+**Resolution:**
+1. If CAT-3 raised against Dev Agent: Dev Agent fixes UI code to match UX Spec → UX Agent re-reviews → CR-9 re-executed → same item fails twice → escalate to user
+2. If CAT-3 raised against SE Agent: SE Agent updates UI architecture → UX Agent re-reviews
+3. If CAT-3 raised against UX Agent (spec error): UX Agent corrects spec extraction error → challenger re-reviews
+4. If spec is correct but unimplementable: escalate to user for UX requirement adjustment
+
+### CAT-3 Challenge Resolution Flow
+
+```
+CAT-3 raised (CR-9 failure — code deviates from UX Spec)
+       │
+       ├── Agent accepts → Fix UI code to match UX Spec → CR-9 re-executed → Phase proceeds
+       │
+       └── Agent rejects (claims UX Spec is unimplementable or conflicts with framework) 
+                    │
+                    ├── UX Agent & Dev Agent negotiate: can UX Spec be reasonably implemented?
+                    │    ├── Yes: Dev Agent implements → UX Agent re-reviews
+                    │    ├── Spec is too vague: UX Agent requests user clarification (does NOT invent)
+                    │    └── Spec conflicts with framework: ESCALATED to User
+                    │
+                    └── Same CR-9 sub-item fails twice → ESCALATED to User
+```
+
+**Escalation rule:** UX disputes that can't be resolved between UX Agent and Dev Agent in one cycle → immediate user escalation. The user is the final arbiter — UX Agent only enforces requirements the user has provided.
 
 ## Challenge Prevention
 

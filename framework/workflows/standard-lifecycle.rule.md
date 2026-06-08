@@ -59,13 +59,75 @@ Phase 1       Phase 2      Phase 3       Phase 4      Phase 5      Phase 6      
 - **Reviewer:** Dev Agent
 - **Gate:** Dev Agent confirms design is complete and implementable
 
+### Phase 2.6: UX Specification Extraction (UX需求规范提取) — CONDITIONAL
+
+**Trigger:** This phase executes ONLY when ALL of the following are true:
+1. `docs/.framework-init.lock` → `ui_stack.has_ui: true`
+2. The current requirement involves UI design (PRD §5.4 is populated)
+
+**Skip condition:** If the requirement has no UI component (backend-only, API-only), this phase is skipped entirely. Phase transition goes from Phase 2 directly to Phase 3.
+
+**Principle:** The UX Agent does NOT design — it EXTRACTS and ORGANIZES UX requirements from existing design artifacts (PRD §5.4, SE Design §4.5, user-provided design files). Every requirement in the UX Specification is traceable to a source. Gaps are flagged as CAT-1 challenges, not filled by the UX Agent.
+
+- **Agent:** UX Agent (`framework/agents/ux-agent.skill.md`)
+- **Input:** `docs/prd.md` (specifically §5.4 UX Constraints), `docs/se-design.md` (specifically §4.5 UI Architecture), user-provided design files (cited in UX-02), `docs/ux-guidelines.md`, `docs/coding-standards.md` §0.6
+- **Output:** `docs/requirements/REQ-YYYY-NNN-{slug}/ux-spec.md`
+- **Report:** `docs/requirements/REQ-YYYY-NNN-{slug}/reports/phase-2.6-ux-spec-report.md`
+- **Format:** Follow `framework/artifacts/ux-spec.template.md`
+- **Reviewer:** Dev Agent (implementability check)
+- **Gate:** Dev Agent confirms extracted requirements are specific enough to implement; all PRD UX constraints (UX-01 through UX-05) have corresponding extracted spec items; SE Design §4.5 component tree is covered; gaps are explicitly documented
+
+#### UX Specification Extraction Flow
+
+```
+Phase 2 (SE Design) Complete
+       │
+       ├── UI requirement? ──NO──▶ Phase 3 (Story Design)
+       │
+       └── YES
+            │
+            ▼
+       UX Agent loads PRD §5.4 + SE Design §4.5 + design files + ux-guidelines.md
+            │
+            ▼
+       UX Agent EXTRACTS UX requirements from sources (does NOT design)
+            │
+            ├── Trace every requirement to a source
+            ├── Extract per-component visual/interaction/state requirements
+            ├── Map design values to project design tokens
+            ├── Document gaps (missing/ambiguous requirements)
+            └── Flag gaps as CAT-1 challenges → request user input
+            │
+            ▼
+       UX Agent produces UX Requirements Specification (ux-spec.md)
+            │
+            ▼
+       Dev Agent reviews: are extracted requirements implementable?
+            │
+            ├── Sufficiently specified → ACCEPT → Phase 3
+            ├── Gaps block implementation → UX Agent escalates to user → revise → re-review
+            └── UX Agent invented requirements? → REJECT (violates extraction principle)
+```
+
+#### UX Specification Phase Report
+
+The UX Agent generates `phase-2.6-ux-spec-report.md` containing:
+- Sources analyzed (PRD, SE Design, design files, guidelines)
+- Requirements extracted per source (count)
+- Specification items traceable to sources (count)
+- Gaps documented and escalated to user (list)
+- Design token mapping coverage
+- CAT-1 challenges raised for missing requirements
+- Dev Agent implementability sign-off
+- Confirmation: no requirements invented — all traceable
+
 ### Phase 3: Story Design (Development Story)
 - **Agent:** Dev Agent (`framework/agents/dev-agent.skill.md`)
-- **Input:** `docs/se-design.md`, `docs/prd.md`
+- **Input:** `docs/se-design.md`, `docs/prd.md`, `docs/ux-spec.md` (if UI requirement)
 - **Output:** `docs/dev-story.md`
 - **Format:** Follow `framework/artifacts/dev-story.template.md`
-- **Reviewer:** SE Agent
-- **Gate:** SE Agent confirms story aligns with design
+- **Reviewer:** SE Agent + UX Agent (if UI requirement)
+- **Gate:** SE Agent confirms story aligns with design; **UX Agent confirms UI tasks have UX specification coverage (UX-S-01~UX-S-04)**
 
 ### Phase 4: Test Plan
 - **Agent:** Test Agent (`framework/agents/test-agent.skill.md`)
@@ -102,59 +164,79 @@ Before generating the Phase 5 Report, the Dev Agent MUST execute the following s
 **Challenge rule:** If the self-check discovers a catalog conflict (duplicate method, unregistered constant, terminology clash), the Dev Agent MUST file a **self-challenge** (CAT-2a/2b/2c) with a CH-YYYY-NNN record in the requirement's `challenges/` directory. The self-challenge must be RESOLVED before the Phase 5 Report can be generated.
 
 ### Phase 6: Code Review (代码审核)
-- **Agent:** SE Agent (`framework/agents/se-agent.skill.md`) — acting as Code Reviewer
-- **Input:** Source code changes, `docs/dev-story.md`, `docs/prd.md` (or Dev Story if shortcut), `docs/test-plan.md`, language-specific coding standards, `docs/architecture.md`
-- **Output:** `docs/code-review-report.md`
-- **Format:** Follow the Code Review Checklist (8 items, defined below)
+- **Agent:** SE Agent (`framework/agents/se-agent.skill.md`) — acting as Code Reviewer (CR-1~CR-8)
+- **Co-Reviewer (if UI):** UX Agent (`framework/agents/ux-agent.skill.md`) — UX Specification Compliance Reviewer (CR-9)
+- **Input:** Source code changes, `docs/dev-story.md`, `docs/prd.md` (or Dev Story if shortcut), `docs/test-plan.md`, language-specific coding standards, `docs/architecture.md`, `docs/ux-spec.md` (if UI requirement), `docs/ux-guidelines.md` (if UI)
+- **Output:** `docs/code-review-report.md` (with CR-9 section if UI)
+- **Format:** Follow the Code Review Checklist (9 items, defined below)
 - **Reviewer:** — (this phase IS the review; its output gates Phase 7)
-- **Gate:** ALL 8 checklist items must pass. Any failure triggers a formal challenge.
+- **Gate:** ALL applicable checklist items must pass. Any failure triggers a formal challenge. **For UI requirements, CR-9 must pass in addition to CR-1~CR-8.**
 
-#### Code Review Checklist (8 Items)
+#### Code Review Checklist
 
-| ID | Item | What to Verify | Challenge Basis |
-|----|------|---------------|-----------------|
-| CR-1 | Requirement Completeness | Every PRD requirement / Dev Story task has corresponding implementation. No TODOs, FIXMEs, stubs. | Cite specific PRD FR-XXX or Dev Story TASK-XXX |
-| CR-2 | Dev Story Alignment | Code structure matches Dev Story: file paths, function signatures, class structures, data flow. Deviations must be documented. | Cite specific Dev Story §section and line |
-| CR-3 | Standards Compliance | Naming, formatting, file organization follow the language-specific coding standards. No prohibited patterns. | Cite specific standards chapter/clause |
-| CR-4 | Architectural Integrity | No circular dependencies. Module dependency rules respected. Public API encapsulation correct. | Cite `docs/architecture.md` section or dependency rule |
-| CR-5 | Correctness | All code paths reachable. Error handling covers all documented scenarios. Edge cases handled. No race conditions. | Cite specific error scenario from Dev Story §5 or SE Design |
-| CR-6 | Test Coverage | All new functions have tests. AAA pattern followed. Happy path, error path, boundary conditions covered. No regressions. | Cite specific function or test case from test plan |
-| CR-7 | Security | No hardcoded secrets. External input validated. Injection vectors closed. No eval() or equivalent. | Cite coding standards §Security section |
-| CR-8 | No Omissions | No commented-out code. No empty catch blocks. No unreachable code. No debug/log temp code. All imports used. | Cite specific file:line |
+| ID | Item | Reviewer | What to Verify | Challenge Basis |
+|----|------|----------|---------------|-----------------|
+| CR-1 | Requirement Completeness | SE Agent | Every PRD requirement / Dev Story task has corresponding implementation. No TODOs, FIXMEs, stubs. | Cite specific PRD FR-XXX or Dev Story TASK-XXX |
+| CR-2 | Dev Story Alignment | SE Agent | Code structure matches Dev Story: file paths, function signatures, class structures, data flow. Deviations must be documented. | Cite specific Dev Story §section and line |
+| CR-3 | Standards Compliance | SE Agent | Naming, formatting, file organization follow coding standards + §0.6 UX规范约定 (if UI). No prohibited patterns. | Cite specific standards chapter/clause |
+| CR-4 | Architectural Integrity | SE Agent | No circular dependencies. Module dependency rules respected. Public API encapsulation correct. | Cite `docs/architecture.md` section or dependency rule |
+| CR-5 | Correctness | SE Agent | All code paths reachable. Error handling covers all documented scenarios. Edge cases handled. No race conditions. | Cite specific error scenario from Dev Story §5 or SE Design |
+| CR-6 | Test Coverage | SE Agent | All new functions have tests. AAA pattern followed. Happy path, error path, boundary conditions covered. No regressions. | Cite specific function or test case from test plan |
+| CR-7 | Security | SE Agent | No hardcoded secrets. External input validated. Injection vectors closed. No eval() or equivalent. | Cite coding standards §Security section |
+| CR-8 | No Omissions | SE Agent | No commented-out code. No empty catch blocks. No unreachable code. No debug/log temp code. All imports used. | Cite specific file:line |
+| **CR-9** | **UX Specification Compliance** | **UX Agent** | **UI implementation conforms to extracted UX Specification: visual requirements, interaction requirements, responsive requirements, accessibility requirements, design system compliance, UX state completeness. (Conditional — only when requirement has UI.)** | **Cite UX Spec §section, §0.6 clause, or `docs/ux-guidelines.md`** |
+
+**CR-9 Sub-Items:**
+
+| Sub-ID | Item | Challenge Basis |
+|--------|------|----------------|
+| CR-9.1 | Visual Requirements Compliance: Component states match UX Spec §2 extracted requirements | UX Spec §2.X per-component visual requirements table |
+| CR-9.2 | Interaction Requirements Compliance: Behavior matches UX Spec §3 | UX Spec §3 interaction requirements |
+| CR-9.3 | Responsive Requirements Compliance: Layout breaks at correct breakpoints per UX Spec §4 | UX Spec §4 responsive requirements |
+| CR-9.4 | Accessibility Requirements Compliance: ARIA, focus, semantics per UX Spec §5 | UX Spec §5 accessibility requirements |
+| CR-9.5 | Design System Compliance: Design tokens used per UX Spec §6, no hardcoded styles | `docs/coding-standards.md` §0.6 + UX Spec §6 |
+| CR-9.6 | UX State Completeness: Loading, empty, error states implemented per spec | UX Spec §2 per-component state requirements |
 
 #### Code Review Flow Control
 
 ```
 Phase 5 Complete
       │
-      ▼
-SE Agent performs Code Review (8-item checklist)
+      ├── UI requirement? ──NO──▶ SE Agent reviews CR-1~CR-8
+      │                                │
+      │                                └── ALL 8 PASS → APPROVED → Phase 7
       │
-      ├── ALL 8 PASS ──▶ Report APPROVED ──▶ Phase 7 (Validation)
-      │
-      └── ANY FAIL ──▶ Formal challenge filed against Dev Agent
+      └── YES
+           │
+           ├── SE Agent reviews CR-1~CR-8 (in parallel)
+           └── UX Agent reviews CR-9
+                 │
+                 ├── ALL CR-1~CR-9 PASS → Report APPROVED → Phase 7
+                 │
+                 ├── CR-1~CR-8 FAIL → SE Agent challenges Dev Agent
+                 └── CR-9 FAIL → UX Agent files CAT-3 challenge against Dev Agent
                             │
                             ▼
                      Dev Agent fixes code
                             │
-                            ▼
-                     SE Agent re-reviews
-                            │
-                            ├── ALL PASS ──▶ Phase 7
-                            │
-                            └── STILL FAILING ──▶ Escalate to User
+                            ├── CR-1~CR-8 fixes → SE Agent re-reviews (failed items only)
+                            └── CR-9 fixes → UX Agent re-reviews (failed sub-items only)
+                                    │
+                                    ├── ALL PASS → Phase 7
+                                    └── STILL FAILING → Escalate to User
 ```
 
-- **Phase 7 CANNOT begin** until the Code Review Report status is APPROVED
+- **Phase 7 CANNOT begin** until the Code Review Report status is APPROVED (all applicable CR-1~CR-9 pass)
 - Re-review cycle: same item fails twice → escalate to user for a final decision
 - Each failed checklist item generates a separate formal challenge entry in the review report
+- CR-1~CR-8 challenges: SE Agent vs Dev Agent (standard); **CR-9 challenges: UX Agent vs Dev Agent (CAT-3)**
 - Challenges follow all rules in `framework/workflows/challenge-mechanism.rule.md`
 
 ### Phase 6.5: Catalog Consistency Verification (目录一致性核查)
 
 **Mandatory gate between Code Review (Phase 6) APPROVAL and Phase 7 (Validation).**
 
-After the 8-item Code Review checklist passes (status: APPROVED), the SE Agent MUST perform an additional catalog consistency check before the orchestrator advances to Phase 7:
+After all applicable Code Review checklist items pass (CR-1~CR-8 by SE Agent, CR-9 by UX Agent if UI; status: APPROVED), the SE Agent MUST perform an additional catalog consistency check before the orchestrator advances to Phase 7:
 
 1. **Method declaration check:** Compare the "New Symbol Declaration" section in the Phase 5 Report against the actual code diff. Every new exported method in the code MUST be listed in the declaration. Every declared method MUST exist in the code diff.
 2. **Constant declaration check:** Compare the "New Symbol Declaration" section in the Phase 5 Report against the actual code diff. Every new constant in the code MUST be listed in the declaration. Every declared constant MUST exist in the code diff.
@@ -181,9 +263,10 @@ After the 8-item Code Review checklist passes (status: APPROVED), the SE Agent M
 1. **Before each phase transition**, check `framework/workflows/plugin-extension.rule.md` for plugin hooks
 2. **Before each phase transition**, check `framework/workflows/challenge-mechanism.rule.md` for pending challenges
 3. **A phase is complete** only when its quality gate is satisfied AND its reviewer has accepted the output
-4. **Phase 5.5 is a hard gate** — Phase 5 Report cannot be generated until catalog compliance self-check passes
-5. **Phase 6 is a hard gate** — Phase 7 is unreachable without an APPROVED code review report
-6. **Phase 6.5 is a hard gate** — Phase 7 is unreachable if catalog consistency verification raises unresolved challenges
+4. **Phase 2.6 (UX Specification Extraction) is a conditional gate** — executes only when project has UI AND requirement involves UI design; UX Agent extracts requirements from existing design artifacts (does not design); when skipped, transition goes from Phase 2 → Phase 3 directly
+5. **Phase 5.5 is a hard gate** — Phase 5 Report cannot be generated until catalog compliance self-check passes
+6. **Phase 6 is a hard gate** — Phase 7 is unreachable without an APPROVED code review report (CR-1~CR-8, plus CR-9 if UI)
+7. **Phase 6.5 is a hard gate** — Phase 7 is unreachable if catalog consistency verification (or UX consistency) raises unresolved challenges
 7. **Full lifecycle: no phase skipping** — each phase (including sub-phases) must complete in order
 8. **Shortcut path: defined entry point** — enter at Phase 4 or Phase 5 with user-provided Dev Story
 9. **Phase re-entry** — a challenge may force re-entry to a prior phase
@@ -200,6 +283,7 @@ The orchestrator tracks lifecycle state implicitly through document presence:
 | `docs/test-plan.md` | Phase 4 complete |
 | Git commit with source changes | Phase 5 complete |
 | `docs/code-review-report.md` with status `APPROVED` | Phase 6 complete |
+| `docs/requirements/REQ-*/ux-spec.md` | Phase 2.6 complete (if UI requirement) |
 | `docs/validation-report.md` with all pass | Phase 7 complete (lifecycle done) |
 
 ## Agent Handoff Protocol

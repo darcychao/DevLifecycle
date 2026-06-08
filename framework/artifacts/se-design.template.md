@@ -87,6 +87,38 @@ Function/API signatures:
 ### 4.4 State Management
 [How state flows through the system. Stateless vs stateful, session management, persistence.]
 
+### 4.5 UI Architecture (if project has UI)
+
+#### 4.5.1 Component Tree
+```
+[ASCII diagram of the component hierarchy]
+App
+├── Layout
+│   ├── Header
+│   │   ├── Navigation
+│   │   └── UserMenu
+│   ├── Sidebar
+│   └── Content
+│       └── <PageContent />
+└── Footer
+```
+
+#### 4.5.2 UI State Management
+[How UI state is managed — local component state, global store, URL state]
+- Local state: [useState, useReducer, etc.]
+- Global state: [Redux store slice, Zustand store, Context]
+- URL state: [Query parameters, path parameters]
+
+#### 4.5.3 UX Constraint Mapping
+Map PRD UX constraints to specific design decisions:
+
+| UX Constraint | Design Decision | Module |
+|--------------|-----------------|--------|
+| UX-01: Interaction Flow | [How the flow maps to routes/components] | [Module] |
+| UX-03: Responsive Design | [Breakpoint implementation strategy] | [Module] |
+| UX-04: Form Interaction | [Form validation architecture] | [Module] |
+| UX-05: Feedback States | [Loading/error/empty state handling] | [Module] |
+
 ---
 
 ## 5. Data Flow

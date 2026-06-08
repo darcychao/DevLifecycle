@@ -59,6 +59,14 @@ Error States: [What errors this can produce]
 Side Effects: [Database writes, API calls, events emitted]
 ```
 
+#### UI Component Specification (if this task creates/modifies UI components)
+
+For each UI component in this task, provide:
+
+| Component | Visual Reference | States | Styling | A11y |
+|-----------|-----------------|--------|---------|------|
+| `ComponentName` | [Size, spacing, color, typography] | [default, hover, active, focus, disabled, loading, error] | [Tailwind classes / CSS Module / styled-component ref] | [ARIA role, labels, keyboard handlers] |
+
 #### Test Coverage
 - **Unit Test:** `tests/path/to/test.spec.ts` — test functionName
   - Test case: valid input → expected output
@@ -102,6 +110,16 @@ Side Effects: [Database writes, API calls, events emitted]
 - [ ] No security vulnerabilities (OWASP Top 10 checked)
 - [ ] Input validation at all external boundaries
 - [ ] Test file organization follows standards
+
+### 6.1 UX Compliance Checklist (MANDATORY when story involves UI implementation)
+
+> **This checklist is MANDATORY when the Dev Story includes tasks that create or modify UI components (pages, forms, layouts, visual elements).** All blocking items (UX-S-01 to UX-S-04) must be checked before Phase 4 transition per `framework/workflows/ux-constraint.rule.md`.
+
+- [ ] **UX-S-01: Component Visual Specification** — Each UI component has defined: dimensions, spacing, colors, typography, state variants (default/hover/active/focus/disabled)
+- [ ] **UX-S-02: Component Interaction Behavior** — Each interactive component has defined: hover/active/focus/disabled states, click/drag/scroll/keyboard responses
+- [ ] **UX-S-03: Layout Implementation** — Layout uses the project's detected layout system (`docs/ux-guidelines.md`), responsive breakpoints match project conventions (`docs/coding-standards.md` §0.6)
+- [ ] **UX-S-04: Styling Method** — Styling approach matches project convention (§0.6.3): Tailwind CSS class order / CSS Module naming / styled-component patterns
+- [ ] **UX-S-05: Accessibility Implementation** — ARIA attributes specified, keyboard navigation defined, focus management planned, semantic HTML used
 
 ---
 

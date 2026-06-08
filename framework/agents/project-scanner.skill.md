@@ -99,6 +99,53 @@ For each file, also record:
 - Complexity flag: `true` if >200 lines
 - Path aliases used (from `tsconfig.json` `paths` or equivalent)
 
+#### A.4 UX File Pattern Detection
+
+When the project has UI (detected in Step 0.1.1), perform additional UX-specific classification for all component/asset files:
+
+**A.4.1 Component File Analysis:**
+For each `component`-classified file, detect:
+- **Component type:** Page (under `pages/`, `views/`, `routes/`), Layout (under `layouts/`), UI Component (under `components/`), Feature Component (under feature dirs)
+- **Styling approach used:** Tailwind class names, CSS Module imports, styled-component declarations, Sass/SCSS imports
+- **State management hooks used:** `useState`, `useReducer`, `useContext`, Redux hooks, Zustand stores, etc.
+- **Props pattern:** TypeScript interface/type for props, PropTypes, destructured inline, default props
+- **Accessibility markers:** ARIA attributes (`aria-*`, `role`), semantic HTML elements, `alt` attributes, tabIndex usage
+- **Responsive patterns:** Breakpoint-specific class names, media query hooks, responsive utility usage
+
+**A.4.2 Styling File Analysis:**
+For each styling file (`.css`, `.scss`, `.less`, `.module.css`, `.module.scss`):
+- **Styling method:** Global CSS, CSS Module, Sass/SCSS, Less
+- **Naming convention:** BEM, camelCase, kebab-case class names
+- **Custom properties (CSS variables):** Count and naming patterns → design tokens
+
+**A.4.3 Design Token Detection:**
+Scan for shared design token files (common paths: `src/styles/tokens.*`, `src/theme/*`, `tailwind.config.*`, `src/shared/theme/*`):
+- **Color palette:** Extract all color values and their semantic names
+- **Typography scale:** Extract font sizes, font families, font weights
+- **Spacing scale:** Extract spacing/sizing values
+- **Breakpoints:** Extract responsive breakpoint values
+- **Shadow/elevation:** Extract box-shadow values and elevation levels
+
+**Output — UX File Report:**
+```json
+{
+  "ux_files": {
+    "total_ui_components": 42,
+    "by_type": { "page": 8, "layout": 3, "ui_component": 22, "feature_component": 9 },
+    "styling_breakdown": { "tailwind": 0.65, "css_module": 0.25, "styled_components": 0.10 },
+    "state_patterns": { "useState": 38, "useReducer": 4, "zustand": 6, "redux": 0 },
+    "accessibility_score": { "aria_usage_pct": 0.45, "semantic_html_pct": 0.72, "alt_text_pct": 0.88 },
+    "responsive_usage_pct": 0.60,
+    "design_tokens": {
+      "colors": 24,
+      "typography": { "font_sizes": 8, "font_families": 3 },
+      "spacing": { "scale": [4, 8, 12, 16, 20, 24, 32, 48, 64] },
+      "breakpoints": { "sm": 640, "md": 768, "lg": 1024, "xl": 1280 }
+    }
+  }
+}
+```
+
 ---
 
 ### Phase B: Shared Resource Detection
@@ -977,6 +1024,86 @@ The orchestrator uses the scanner's convention reports to produce the **authorit
 - Inconsistencies (<70% coverage) are explicitly flagged with file paths
 - Merge actions list is complete (every generic standard section evaluated)
 - Detected conventions are written to both `docs/coding-standards.md` §0 and `.scanner-report.json`
+
+#### F.6 UX Convention Detection (if project has UI)
+
+When the project has UI (detected in Step 0.1.1 and confirmed in A.4), detect UX conventions and generate `docs/coding-standards.md` §0.6 and `docs/ux-guidelines.md`.
+
+**F.6.1 UI Framework & Library Detection:**
+
+| Detection Target | Method | Example Output |
+|-----------------|--------|----------------|
+| **UI Framework version** | Extract from `package.json` dependencies | React 18.3.x |
+| **Component library** | Check which library imports are most frequent | @mui/material 5.x (87% of component imports) |
+| **Styling approach** | From A.4.2 analysis, determine dominant styling method | Tailwind CSS (65%), CSS Modules (25%) |
+| **State management** | From A.4.1 hook usage counts | Zustand (60%), useState (40%) |
+| **Routing library** | From `package.json` + import analysis | react-router-dom 6.x |
+| **Animation library** | From `package.json` + import analysis | framer-motion 11.x |
+
+**F.6.2 Component Convention Detection:**
+
+Analyze the component file inventory (A.4.1) to detect:
+
+| Convention | Method | Example |
+|-----------|--------|---------|
+| **Component naming** | Check file name casing for component-classified files | `PascalCase.tsx` (98%) |
+| **Component file structure** | Per-component file count and types | 1 file per component (45%), co-located styles+test (55%) |
+| **Props definition** | How props are typed | `interface XProps` with named export (92%) |
+| **Export pattern** | Named vs default | Named export (78%), default (22%) |
+| **Component composition** | Composition vs inheritance patterns | Composition via `children` (85%), render props (10%) |
+
+**F.6.3 Styling Convention Detection:**
+
+| Convention | Method | Example |
+|-----------|--------|---------|
+| **Tailwind class ordering** | If Tailwind detected, check class order patterns | Layout → sizing → typography → colors → states |
+| **CSS Module naming** | If CSS Modules, check file naming | `*.module.css` or `*.module.scss` |
+| **CSS-in-JS pattern** | If styled-components/emotion, check naming | `StyledX` prefix (76%), or inline template literals |
+| **Responsive pattern** | Check for breakpoint usage in styles | `md:` prefix (Tailwind), `@media (min-width: 768px)` (CSS) |
+| **Design token usage** | How colors/spacing/typography are referenced | CSS variables (65%), Tailwind theme config (35%) |
+
+**F.6.4 Layout & Responsive Design Detection:**
+
+| Convention | Method | Example |
+|-----------|--------|---------|
+| **Layout system** | Check for layout component usage | Flexbox (85%), CSS Grid (12%), absolute positioning (3%) |
+| **Container pattern** | Check for container/wrapper components | `max-w-7xl mx-auto` (60%), custom Container component (25%) |
+| **Spacing scale** | Extract common spacing values | `p-4` (used 142 times), `gap-6` (86 times), `m-8` (53 times) |
+| **Breakpoint usage** | Count responsive modifier usage per breakpoint | `md:` (65%), `lg:` (45%), `sm:` (30%), `xl:` (15%) |
+
+**F.6.5 Accessibility Convention Detection:**
+
+| Convention | Method | Example |
+|-----------|--------|---------|
+| **ARIA usage** | Count `aria-*` attributes per component | Average 2.3 aria attributes per interactive component |
+| **Semantic HTML** | Ratio of semantic elements to `<div>` in component JSX | 45% semantic (`<button>`, `<nav>`, `<main>`) |
+| **Alt text** | Check for `alt` attribute on `<img>` tags | 88% of `<img>` tags have `alt` |
+| **Keyboard handling** | Check for `onKeyDown`, `tabIndex`, `onKeyPress` | 35% of interactive components have keyboard handlers |
+| **i18n pattern** | Detect i18n library usage and key naming | `next-intl` with dot-notation keys: `page.section.key` |
+
+**F.6.6 Generate §0.6 UX规范约定:**
+
+After detection, generate the project-level UX standard into `docs/coding-standards.md` §0.6. The content follows the template defined in `framework/workflows/coding-standards-hierarchy.rule.md` §0.6.
+
+**Merge actions for §0.6:**
+- **confirm:** Detected conventions are clear (>80% coverage) → keep, annotate "✓ confirmed"
+- **override:** Project convention differs from generic UX best practice → REPLACE, annotate "⚠ project standard overrides"
+- **add:** Project-specific UX convention with no generic equivalent → add, annotate "⬢ project-specific"
+
+**F.6.7 Generate `docs/ux-guidelines.md`:**
+
+Produce a standalone UX guidelines document following the structure in `framework/workflows/initialization.rule.md` Step 0.5.1. This document is the authoritative UX reference for all agents implementing UI features.
+
+**F.6.8 UX Convention Quality Gates:**
+- [ ] All detected UX conventions have coverage statistics
+- [ ] Styling approach detection is unambiguous (>70% for dominant method)
+- [ ] Component naming pattern is consistent (>80% coverage)
+- [ ] Responsive breakpoint values are extracted and documented
+- [ ] Accessibility baseline is measured and recorded
+- [ ] Design token inventory (colors, typography, spacing) is complete
+- [ ] §0.6 is appended to `docs/coding-standards.md`
+- [ ] `docs/ux-guidelines.md` is generated
+- [ ] UX stack record is written to `.scanner-report.json` → `detected_conventions.ux`
 
 ---
 
