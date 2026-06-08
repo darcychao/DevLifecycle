@@ -1,6 +1,6 @@
 # Development Lifecycle Framework
 
-AI 智能体驱动的软件开发生命周期框架。通过标准化的 7 阶段流程编排 SE、Dev、Test 三大智能体协同工作，内置挑战/纠偏机制、阶段报告体系、需求目录隔离和插件扩展系统。
+AI 智能体驱动的软件开发生命周期框架。通过标准化流程编排 Scanner、SE、UX、Dev、Test 五大智能体协同工作，内置挑战/纠偏机制、阶段报告体系、需求目录隔离、UX 规范提取与检视、插件扩展系统。
 
 ## 架构概览
 
@@ -8,16 +8,17 @@ AI 智能体驱动的软件开发生命周期框架。通过标准化的 7 阶�
 ┌──────────────────────────────────────────────────────────────┐
 │                    CLAUDE.md (编排器)                         │
 ├──────────────────────────────────────────────────────────────┤
-│  Agents   │ Scanner │ SE Agent │ Dev Agent │ Test Agent        │
+│  Agents   │ Scanner │ SE │ UX │ Dev │ Test Agents            │
 ├──────────┼──────────────────────────────────────────────────┤
 │  Workflow │  Standard Lifecycle + Challenge + Plugin         │
-│           │  + Dev-Story Shortcut                            │
+│           │  + Dev-Story Shortcut + UX Spec + Review         │
 ├──────────┼──────────────────────────────────────────────────┤
-│ Artifacts │  PRD │ SE Design │ Story │ Test Plan             │
+│ Artifacts │  PRD │ SE Design │ UX Spec │ Story │ Test Plan  │
 ├──────────┼──────────────────────────────────────────────────┤
 │  Reports  │  每个阶段产出阶段报告 + 挑战记录文档               │
 ├──────────┼──────────────────────────────────────────────────┤
 │ Standards │  JavaScript │ TypeScript │ Java │ Python         │
+│           │  + UX Guidelines (if UI)                         │
 ├──────────┼──────────────────────────────────────────────────┤
 │  Plugins  │  12 hook points at every phase transition        │
 └──────────────────────────────────────────────────────────────┘
@@ -26,17 +27,21 @@ AI 智能体驱动的软件开发生命周期框架。通过标准化的 7 阶�
 ## 生命周期
 
 ```
-Phase 1    Phase 2    Phase 3    Phase 4    Phase 5    Phase 6      Phase 7
-┌──────┐  ┌──────┐  ┌───────┐  ┌──────┐  ┌──────┐  ┌────────┐  ┌──────────┐
-│ PRD  │─▶│  SE  │─▶│ Story │─▶│ Test │─▶│ Dev  │─▶│ Code   │─▶│Validation│
-│Input │  │Design│  │Design │  │ Plan │  │Coding│  │Review  │  │ (Plugin) │
-└──────┘  └──────┘  └───────┘  └──────┘  └──────┘  └────────┘  └──────────┘
-  用户      SE智能体   开发智能体   测试智能体  开发智能体   SE智能体     测试智能体
+Phase 1    Phase 2    Phase 2.6  Phase 3    Phase 4    Phase 5    Phase 6      Phase 7
+┌──────┐  ┌──────┐  ┌───────┐  ┌───────┐  ┌──────┐  ┌──────┐  ┌────────┐  ┌──────────┐
+│ PRD  │─▶│  SE  │─▶│  UX   │─▶│ Story │─▶│ Test │─▶│ Dev  │─▶│ Code   │─▶│Validation│
+│Input │  │Design│  │ Spec  │  │Design │  │ Plan │  │Coding│  │Review  │  │ (Plugin) │
+└──────┘  └──────┘  └───────┘  └───────┘  └──────┘  └──────┘  └────────┘  └──────────┘
+  用户      SE智能体   UX智能体   开发智能体  测试智能体  开发智能体  SE+UX智能体  测试智能体
+                     (条件执行：
+                      UI项目激活)
 
 每个阶段产出: [主制品] + [阶段报告]    每次挑战产出: [挑战记录文档]
 ```
 
 **双入口：** 全生命周期（PRD 输入）/ Dev-Story 快捷入口（跳过上游直接进入开发编码）
+
+**Phase 2.6 UX Spec Extraction (条件阶段)：** 仅在项目有 UI 且需求涉及界面设计时激活。UX Agent **从已有设计产物中提取** UX 需求级规范（不进行主动设计）。
 
 ## 快速开始
 
@@ -46,18 +51,19 @@ Phase 1    Phase 2    Phase 3    Phase 4    Phase 5    Phase 6      Phase 7
 @CLAUDE.md 初始化框架
 ```
 
-框架自动执行 8 步初始化协议：检测语言栈 → Scanner 扫描（文件分类、模块识别、依赖分析、**编码风格检测**）→ 生成文档 → 交叉验证 → 复杂度分级 → 写入锁文件。
+框架自动执行 8 步初始化协议：检测语言栈 + **UI 框架/UX 依赖** → Scanner 扫描（文件分类、模块识别、依赖分析、**编码风格检测**、**UX 规范检测**）→ 生成文档 → 交叉验证 → 复杂度分级 → 写入锁文件。
 
 生成产物：
 - `docs/architecture.md` — 项目架构文档（含 ASCII 架构图、依赖矩阵）
-- `docs/module-map.md` — 模块对照表（**含关键词→模块反向索引**，支持按功能关键词快速定位模块；含功能能力标签；文件→模块映射、公共 API 清单、共享资源目录）
-- `docs/coding-standards.md` — 编码规范（**含 §0 项目检测约定**：公共方法、常量定义、文件组织、编码风格，自动检测覆盖率，冲突时覆盖通用规则）
+- `docs/module-map.md` — 模块对照表（含关键词→模块反向索引、功能能力标签、文件→模块映射、共享资源目录）
+- `docs/coding-standards.md` — 编码规范（含 **§0 项目检测约定**：公共方法、常量定义、文件组织、编码风格、**§0.6 UX规范约定**；冲突时覆盖通用规则）
+- `docs/ux-guidelines.md` — **UX 指南**（UI 项目自动生成：UI 技术栈、组件架构、样式约定、布局模式、无障碍基线、设计令牌）
 - `docs/project-structure.md` — 项目结构规范
-- `docs/.scanner-report.json` — 机器可读的扫描数据（含模块详情、关键词标签、功能能力、检测约定，供下游智能体消费）
-- `docs/modules/MOD-XXX.md` — 大型项目的分模块详细文档（含功能清单、依赖关系、架构合规性）
-- `docs/public-method-catalog.md` — 公共方法全量目录（含完整签名、分类、提供模块、消费模块、复用检查参考）
-- `docs/constant-catalog.md` — 常量全量目录（含名称、类型、值、位置、类别、消费文件、魔法值报告）
-- `docs/terminology-glossary.md` — 领域术语表（含自动推导定义、术语关联关系、术语→模块/方法/常量交叉引用、领域聚类）
+- `docs/.scanner-report.json` — 机器可读的扫描数据（含 UX 堆栈记录）
+- `docs/modules/MOD-XXX.md` — 大型项目的分模块详细文档
+- `docs/public-method-catalog.md` — 公共方法全量目录（含完整签名、分类、提供模块、消费模块）
+- `docs/constant-catalog.md` — 常量全量目录（含名称、类型、值、位置、类别、魔法值报告）
+- `docs/terminology-glossary.md` — 领域术语表（含自动推导定义、术语关联、领域聚类）
 
 ### 标准开发流程
 
@@ -71,128 +77,121 @@ Phase 1    Phase 2    Phase 3    Phase 4    Phase 5    Phase 6      Phase 7
 @CLAUDE.md 基于Dev Story开始开发
 ```
 
-## 需求目录模型
+---
 
-每个需求/特性拥有独立的隔离目录，所有制品、报告、挑战记录自包含：
-
-```
-docs/requirements/
-├── index.md                          # 需求注册表（全局）
-└── REQ-2026-001-user-auth/           # 需求隔离目录
-    ├── prd.md                        # Phase 1 制品
-    ├── se-design.md                  # Phase 2 制品
-    ├── dev-story.md                  # Phase 3 制品
-    ├── test-plan.md                  # Phase 4 制品
-    ├── validation-report.md          # Phase 7 制品
-    ├── reports/                      # 阶段完成报告
-    │   ├── phase-1-prd-report.md
-    │   ├── phase-2-se-design-report.md
-    │   ├── phase-3-story-design-report.md
-    │   ├── phase-4-test-plan-report.md
-    │   ├── phase-5-dev-coding-report.md
-    │   ├── phase-6-code-review-report.md
-    │   └── phase-7-validation-report.md
-    └── challenges/                   # 挑战记录
-        └── CH-YYYY-NNN.md
-```
-
-**共享文档**（`docs/` 根目录）：
-- `architecture.md`, `module-map.md`, `coding-standards.md`, `project-structure.md` — Phase 0 初始化产出，所有需求共享
-- `challenges/index.md` — 全局挑战索引（跨需求汇总）
-
-**多需求并行：** 多个 REQ 目录可同时存在，各自独立推进，互不干扰。
-
-## 阶段报告体系
-
-每个阶段完成后 **必须** 生成阶段报告，记录执行详情：
-
-| 报告 | 内容 |
-|------|------|
-| 输入制品清单 | 本阶段依赖的文档及其状态 |
-| 执行摘要 | 执行步骤数、关键决策、偏离说明 |
-| 输出制品清单 | 产出文件及规模 |
-| 质量门检查 | 模板合规、章节完整、审查人确认 |
-| 插件执行记录 | pre/post hook 执行状态 |
-| 审查人签字 | ACCEPT / CHALLENGE |
-
-阶段报告是阶段完成的 **强制凭证** — 无报告不得进入下一阶段。
-
-## 挑战文档体系
-
-每次挑战 **必须** 记录为独立文档，包含：
-
-| 字段 | 说明 |
-|------|------|
-| Basis | 具体规范条款引用 |
-| Evidence | 违规代码路径:行号 |
-| Impact | 影响范围和风险 |
-| Suggested Fix | 具体修复方案 |
-| Resolution | 修复内容、验证方式、重审结果 |
-
-**挑战生命周期：** OPEN → RESOLVED → 验证关闭 / 重新打开 → ESCALATED（2轮僵持后升级给用户）/ REJECTED（无效挑战）
-
-**全局索引**（`docs/challenges/index.md`）记录所有需求的所有挑战，支持跨需求追溯。
-
-## 四大智能体
+## 五大智能体
 
 | 智能体 | 职责 | 核心产出 |
 |--------|------|---------|
-| **Scanner Agent** | 项目结构扫描、模块边界识别、共享资源检测、依赖分析、**公共方法全量编目、常量全量编目、领域术语提取**、关键词提取与功能能力标注、编码风格检测 | module-map.md（含关键词索引）、public-method-catalog.md、constant-catalog.md、terminology-glossary.md、scanner-report.json、coding-standards.md §0（检测约定）、modules/MOD-XXX.md |
-| **SE Agent** | 系统架构设计、代码审核（Phase 6 硬关卡） | SE 设计文档、代码审核报告 |
+| **Scanner Agent** | 项目扫描、模块识别、依赖分析、公共方法编目、常量编目、领域术语提取、**UX 规范检测** | module-map.md、public-method-catalog.md、constant-catalog.md、terminology-glossary.md、scanner-report.json、coding-standards.md §0（含 §0.6 UX规范约定）、ux-guidelines.md |
+| **SE Agent** | 系统架构设计、代码审核（Phase 6 CR-1~CR-8） | SE 设计文档、代码审核报告 |
+| **UX Agent** | **UX 需求规范提取**（Phase 2.6，从已有设计产物中提取，不主动设计）、**UX 规范合规审查**（CR-9） | UX 需求级规范 (ux-spec.md)、CR-9 审查报告章节 |
 | **Dev Agent** | Story 设计、编码实现、挑战响应 | Dev Story、源代码 |
 | **Test Agent** | 测试方案设计、流程验证 | 测试方案、验证报告 |
+
+### UX Agent 核心原则
+
+**UX Agent 从已有设计产物中提取和整理 UX 需求，不进行主动设计。** 所有 UX 规范条目必须可追溯到来源（PRD §5.4、SE Design §4.5、用户提供的设计稿）。无法追溯的需求标记为 GAP 并通过 CAT-1 挑战请求用户补充，绝不自行发明。
+
+**两大工作模式：**
+
+| 模式 | 阶段 | 说明 |
+|------|------|------|
+| **UX Spec Extraction** | Phase 2.6 | 从 PRD UX 约束、SE Design UI 架构、设计稿、ux-guidelines.md 中提取结构化 UX 需求规范 |
+| **UX Spec Compliance Review** | Phase 6 (CR-9) | 6 项子检查：视觉需求合规、交互需求合规、响应式需求合规、无障碍需求合规、设计系统合规、UX 状态完整性 |
+
+---
+
+## 阶段详情
+
+| 阶段 | 智能体 | 输入 | 制品 | 审查人 |
+|------|--------|------|------|--------|
+| 1. PRD | 用户 | 业务需求 | `prd.md`（含 §5.4 UX 约束） | — |
+| 2. SE Design | SE Agent | PRD、架构文档 | `se-design.md`（含 §4.5 UI 架构） | Dev Agent |
+| **2.6 UX Spec** | **UX Agent** | **PRD §5.4、SE Design §4.5、设计稿、UX 指南** | **`ux-spec.md`**（提取，不设计） | **Dev Agent** |
+| 3. Story Design | Dev Agent | SE Design、PRD、UX Spec | `dev-story.md`（含 §6.1 UX 合规检查） | SE Agent + UX Agent |
+| 4. Test Plan | Test Agent | PRD、SE Design、Dev Story | `test-plan.md` | Dev Agent + 用户 |
+| 5. Dev Coding | Dev Agent | Dev Story、Test Plan、UX Spec | 源代码 | SE Agent (Phase 6) |
+| 5.5 Catalog Self-Check | Dev Agent | 代码差异、目录 | 自检（嵌入 Phase 5 Report） | — |
+| 6. Code Review | SE + UX Agent | 代码、Dev Story、Test Plan、UX Spec | 审核报告（CR-1~CR-9） | — |
+| 6.5 Catalog Verification | SE Agent | 代码差异、目录 | 一致性核查 | — |
+| 7. Validation | Test Agent | 代码、Test Plan、审核报告 | 验证报告 | — |
+
+**关键关卡：** Phase 0 锁文件 → Phase 2.6 UX 规范提取（UI 项目）→ Phase 5.5 目录自检 → Phase 6（CR-1~CR-9）→ Phase 6.5 目录一致性 → Phase 7 验证
+
+---
+
+## 代码审核（Phase 6 硬关卡）
+
+SE Agent 执行 CR-1~CR-8，UX Agent 执行 CR-9（UI 项目）：
+
+| 检查项 | 审查者 | 内容 |
+|--------|--------|------|
+| CR-1 需求完整性 | SE Agent | 所有需求均已实现，无 TODO/stub |
+| CR-2 Story 对齐 | SE Agent | 文件路径、函数签名与 Story 一致 |
+| CR-3 规范合规 | SE Agent | 命名、格式、禁止项、§0.6 UX规范约定 |
+| CR-4 架构完整性 | SE Agent | 无循环依赖、模块规则合规 |
+| CR-5 逻辑正确性 | SE Agent | 错误处理、边界条件、竞态 |
+| CR-6 测试覆盖 | SE Agent | AAA 模式、正常/异常/边界路径 |
+| CR-7 安全性 | SE Agent | 无硬编码密钥、注入防护 |
+| CR-8 无遗漏 | SE Agent | 无注释代码、无空 catch、无死代码 |
+| **CR-9 UX 规范合规** | **UX Agent** | **视觉需求、交互需求、响应式、无障碍、设计系统、UX 状态完整性** |
+
+**任一 FAIL → 自动挑战 → 生成挑战记录 → 修复 → 重审 → 全部 PASS 才能进入 Phase 7。**
+
+CR-9 仅审查 UX 规范中 **明确规定的条目**。规范未涵盖的 UI 方面记录为"超出审查范围"，不作为失败项。
+
+---
+
+## UX 约束与规范体系
+
+### 强制 UX 约束（`framework/workflows/ux-constraint.rule.md`）
+
+当项目有 UI 时，PRD 和 Dev Story 涉及界面设计时必须满足：
+
+**PRD 阶段 (§5.4)：**
+
+| 约束 | 内容 | 性质 |
+|------|------|------|
+| UX-01 | 交互流程（页面导航图、用户操作路径） | 阻止性 |
+| UX-02 | 视觉参考（设计稿链接、线框图、样式参考） | 阻止性 |
+| UX-03 | 响应式设计要求（设备类型、断点、布局差异） | 阻止性 |
+| UX-04 | 表单交互规范（验证规则、错误提示、提交行为） | 阻止性（如有表单） |
+| UX-05 | 状态反馈说明（加载中、空状态、错误状态） | 阻止性 |
+| UX-06 | 可访问性要求（键盘、屏幕阅读器、色彩对比度） | 警告 |
+| UX-07 | 动效与过渡要求 | 警告 |
+
+**Phase 2.6 UX 规范提取：** UX Agent 从上述约束 + SE Design UI 架构 + 设计稿中提取结构化 UX 需求规范，标记空白并请求用户补充。
+
+**Phase 6 CR-9 审查：** 仅基于已提取的 UX 规范条目进行合规检查，不在规范范围内的 UI 决策不构成失败。
+
+---
 
 ## 核心机制
 
 ### 挑战机制（最高优先级 — 核心迭代引擎）
 
-挑战机制是框架的 **自校正迭代引擎**。智能体在正常执行过程中 **主动** 发现并报告问题，而非等待审查阶段才暴露。框架将挑战视为积极行为 — 不是失败信号，而是质量保证的手段。
+三大主动挑战类别：
 
-**两大主动挑战类别：**
+| 类别 | 名称 | 触发条件 | 挑战方 |
+|------|------|---------|--------|
+| **CAT-1** | 需求遗漏 | 下游发现上游制品缺少功能需求或设计元素 | 任何智能体 |
+| **CAT-2** | 编码规范违反 | 代码或设计违反项目编码规范 / 目录冲突 | 任何智能体 |
+| **CAT-3** | **UX 规范违反** | **代码偏离已提取的 UX 规范条目（仅限规范明确规定的项目）** | **UX Agent** |
 
-| 类别 | 名称 | 触发条件 | 示例 |
-|------|------|---------|------|
-| **CAT-1** | 需求遗漏 | 下游智能体发现上游制品缺失功能需求或设计元素 | PRD 有 FR-005 但 SE Design 无对应模块 |
-| **CAT-2** | 编码规范违反 | 任何智能体发现代码或设计违反项目编码规范 | 新文件放入错误目录、命名风格与 §0 检测约定不一致 |
-
-**迭代流程：** 智能体执行 → 主动检测 CAT-1/CAT-2 → 发现即发起挑战 → 被挑战方立即修复 → 重新执行 → 通过后继续推进。
-
-**核心规则：**
-- 发现需求遗漏或规范违反时 **立即发起** 挑战，不等下游阶段暴露
-- 挑战必须引用具体规范条款（PRD FR-XXX / coding-standards.md §X.Y）+ 文件:行号
-- 被挑战方 **必须停止当前工作** 优先处理
-- 2 轮僵持后升级给用户决策
-- Code Review（Phase 6）的 8 项检查失败自动触发系统生成型挑战
-- 每次挑战生成独立文档，永久留存
+**CAT-3 约束：** 只能基于 UX 规范中明确规定的条目发起挑战。基于个人美学偏好的挑战将**被驳回**。规范未涵盖的 UI 方面不构成 CAT-3。
 
 详见: `framework/workflows/challenge-mechanism.rule.md`
 
-### 代码审核（Phase 6 硬关卡）
-
-SE Agent 对 Dev Agent 产出的代码执行 8 项强制检查：
-
-| 检查项 | 内容 |
-|--------|------|
-| CR-1 需求完整性 | 所有需求均已实现，无 TODO/stub |
-| CR-2 Story 对齐 | 文件路径、函数签名与 Story 一致 |
-| CR-3 规范合规 | 命名、格式、禁止项检查 |
-| CR-4 架构完整性 | 无循环依赖、模块规则合规 |
-| CR-5 逻辑正确性 | 错误处理、边界条件、竞态 |
-| CR-6 测试覆盖 | AAA 模式、正常/异常/边界路径 |
-| CR-7 安全性 | 无硬编码密钥、注入防护 |
-| CR-8 无遗漏 | 无注释代码、无空 catch、无死代码 |
-
-**任一 FAIL → 自动挑战 → 生成挑战记录 → 修复 → 重审 → 全部 PASS 才能进入 Phase 7。**
-
 ### 插件扩展机制
 
-12 个 Hook 点分布在每个阶段转换处，允许项目注入自定义行为（校验规则、自动化脚本、补充文档等）。
+12 个 Hook 点分布在每个阶段转换处，允许项目注入自定义行为。
 
-详见: `plugins/README.md`
+详见: `framework/workflows/plugin-extension.rule.md`
 
-## 编码规范（二级优先级体系）
+---
 
-编码规范采用 **项目级优先** 的二级体系。所有智能体在执行编码任务时，必须先查阅项目级规范（§0），再查阅通用语言规范。当两者冲突时，项目级规范覆盖通用规范。
+## 编码规范（二级优先级体系 + UX）
 
 ```
 Tier 1 (最高优先级)    Tier 2 (通用兜底)
@@ -201,161 +200,71 @@ Tier 1 (最高优先级)    Tier 2 (通用兜底)
 │ coding-standards │   │ coding-standards.<lang>.md │
 │ .md §0           │──▶│ (15 章通用语言规范)        │
 │ (项目检测约定)     │   │                          │
-└──────────────────┘   └──────────────────────────┘
-  优先遵循              仅在 §0 未覆盖时使用
-  冲突时覆盖 Tier 2      被 §0 覆盖时标记 ⚠
+├──────────────────┤   └──────────────────────────┘
+│ §0.2 公共方法约定  │
+│ §0.3 常量定义约定  │
+│ §0.4 文件组织约定  │
+│ §0.5 编码风格约定  │
+│ §0.6 UX规范约定   │ ← UI 项目自动检测生成
+└──────────────────┘
+  优先遵循，冲突时覆盖 Tier 2
 ```
 
-### 预置语言标准（4 种）
+### §0.6 UX规范约定（UI 项目自动生成）
 
-| 语言 | 文件 | 章节 |
-|------|------|------|
-| JavaScript (ES2022+) | `framework/standards/coding-standards.javascript.md` | 15 章 + 命名速查表 + 禁止项清单 |
-| TypeScript (5.x+) | `framework/standards/coding-standards.typescript.md` | **§0 项目检测约定** + 15 章 + 模块组织规则（§7.4-7.6） |
-| Java (17 LTS+) | `framework/standards/coding-standards.java.md` | 15 章 + 命名速查表 + 禁止项清单 |
-| Python (3.11+) | `framework/standards/coding-standards.python.md` | 15 章 + 命名速查表 + 禁止项清单 |
+| 检测类别 | 检测内容 |
+|----------|---------|
+| UI Framework & Libraries | React/Vue/Angular 版本、组件库、样式方案、状态管理、路由 |
+| 组件命名约定 | 组件文件命名、导出方式、Props 模式 |
+| 样式约定 | Tailwind class 顺序 / CSS Module 命名 / styled-component 模式、响应式断点 |
+| 布局约定 | Flexbox/Grid 使用、容器模式、间距尺度 |
+| 可访问性约定 | ARIA 使用率、语义化 HTML、alt 文本、键盘处理、i18n 模式 |
+| 设计系统集成 | 颜色/字体/间距的设计令牌、组件变体、主题模式 |
 
-### §0 项目检测约定（Tier 1 — 最高优先级）
-
-由 Scanner Agent 在 Phase 0 初始化时自动生成，从实际代码中检测项目级约定：
-
-| 检测类别 | 检测内容 | 输出章节 |
-|----------|---------|---------|
-| **公共方法约定** | 命名模式（动词前缀）、异步模式（Promise/Observable）、返回类型、错误处理风格、参数命名 | §0.2 |
-| **常量定义约定** | 命名风格（UPPER_SNAKE/CamelCase）、类型偏好（enum/const/string literal）、定义位置、分组方式、导出模式、字符串前缀、魔法值容忍度 | §0.3 |
-| **文件组织约定** | 目录/文件命名、桶导出模式、文件同置规则、Feature 目录结构 | §0.4 |
-| **编码风格约定** | 缩进、引号、分号、尾逗号、函数风格、返回类型标注、导入排序、null 处理、错误模式、行宽 | §0.5 |
-
-**四种合并动作：**
-- ✓ **确认（confirmed）** — 项目约定与通用标准一致，直接采用
-- ⚠ **覆盖（overridden）** — 覆盖率 >70% 认定为项目主导约定，覆盖通用标准
-- ◈ **兜底（generic）** — 项目无明确约定，使用通用标准
-- ⬢ **整改（remediation）** — 项目内不一致，标记为需整改项
-
-### 扫描驱动的模块组织规则（§7.4-7.6）
-
-定义了新增代码必须遵守的结构约束：组织模式遵循、共享组件/方法放置规则、模块依赖规则、路径别名使用、公共 API 管理、新增文件检查清单。
-
-其他语言在初始化时从通用模板 `framework/standards/coding-standards.template.md` 自动生成。
-
-## 模块关键词索引
-
-初始化时，Scanner Agent 会自动从代码中提取每个模块的关键词标签，并生成关键词→模块的反向索引。下游智能体可以通过关键词快速定位相关模块，无需遍历整个代码库。
-
-### 索引内容
-
-| 元素 | 来源 | 示例 |
-|------|------|------|
-| **关键词标签** | 导出符号名（驼峰/蛇形分词）、目录名、文件名 | `auth`, `login`, `token`, `session` |
-| **功能能力标签** | 根据导出符号的动词前缀和名词目标自动推断 | "用户认证与会话管理"、"数据格式化工具" |
-| **反向索引** | 关键词→模块对照表，位于 `module-map.md` 第二节 | 搜索 `auth` → 定位 MOD-003 (Auth) |
-
-### 关键词提取规则
-1. 从导出符号名拆分驼峰/蛇形词（`getUserProfile` → `get`, `user`, `profile`）
-2. 加入模块目录名 + 文件名作为关键词
-3. 过滤英文停用词（get/set/the/is/of/in/for 等）
-4. 去重、排序、截断至前 30 个
-
-### 功能能力推断规则
-根据导出符号自动推断模块功能：
-- 动词前缀 → 能力类别（create→CRUD、validate→Validation、fetch→API Communication 等）
-- 名词目标 → 业务领域（User→用户管理、Order→订单处理、Config→配置管理 等）
-- 组合生成 1-5 个能力标签（如 "用户 CRUD 操作"、"身份认证与会话管理"）
-
-### 下游智能体使用方式
-
-| 智能体 | 使用场景 | 索引用途 |
-|--------|---------|---------|
-| **SE Agent** | 分析现有架构、设计技术方案 | 查找 "auth" 关键词 → 定位认证模块 → 查看其公共 API 和依赖关系 |
-| **Dev Agent** | 编码实现前定位模块 | 查找 "validation" 关键词 → 定位验证模块 → 确定导入路径和可用函数 |
-| **Test Agent** | 设计集成测试方案 | 查找 "user" 关键词 → 定位用户模块 → 识别模块交互边界 |
-
-### 索引位置
-- **全局索引:** `docs/module-map.md` 第二节（关键词→模块对照表）
-- **分模块详情:** `docs/modules/MOD-XXX.md` §7（每个模块的完整关键词标签列表）
-- **机器可读:** `docs/.scanner-report.json` → `keyword_index` 字段
+---
 
 ## 目录驱动的开发流程
 
-Phase 0 初始化生成的三份目录是下游智能体的 **权威参考数据源**，确保代码复用、命名一致性和术语统一。编码规范 §0 中定义了 12 条强制规则（MUST-01~MUST-12）来执行这些约束。
+Phase 0 初始化生成的四份目录是下游智能体的**权威参考数据源**：
 
-### 公共方法目录 (`docs/public-method-catalog.md`)
-
-**用途：** 避免重复创建已存在的方法。
-
-| 索引 | 内容 | 使用场景 |
+| 目录 | 用途 | 强制规则 |
 |------|------|---------|
-| Method-to-Module Index | 所有导出方法 + 签名 + 分类 + 提供模块 | 按功能需求查找已存在的等效方法 |
-| Module-to-Methods | 每个模块的方法列表 + 消费模块 | 了解模块提供的完整 API 面 |
-| Unused Exports | 零引用的导出方法 | 清理死代码 |
+| `public-method-catalog.md` | 避免方法重复 | MUST-01~MUST-04 |
+| `constant-catalog.md` | 避免常量重复和魔法值 | MUST-05~MUST-08 |
+| `terminology-glossary.md` | 确保命名和语义统一 | MUST-09~MUST-12 |
+| `ux-guidelines.md` | UX 规范基准（UI 项目） | §0.6 强制约定 |
 
-**强制规则 (§0.2.1)：**
-- MUST-01: 新建方法前查阅方法目录确认无重复
-- MUST-02: 新建方法后在 Phase 5 Report 中声明新增方法清单
-- MUST-03: 死代码每轮扫描审查
-- MUST-04: 新建方法分类与模块现有分类一致
+详见: `framework/workflows/coding-standards-hierarchy.rule.md`
 
-### 常量目录 (`docs/constant-catalog.md`)
-
-**用途：** 避免重复定义常量和魔法值。
-
-| 索引 | 内容 | 使用场景 |
-|------|------|---------|
-| Constant-to-Module Index | 所有常量 + 种类 + 值 + 类别 + 定义模块 | 按类别/值查找已存在的等效常量 |
-| Module-to-Constants | 每个模块的常量列表 + 消费文件 | 了解模块的配置和错误码体系 |
-| Shared Constants | 跨模块使用的常量 | 确保共享常量通过正确路径引用 |
-| Magic Value Report | 内联字面量超标文件 | 定位需要提取常量的代码 |
-
-**强制规则 (§0.3.1)：**
-- MUST-05: 新共享常量注册到常量目录
-- MUST-06: 同类别常量集中存储、统一命名
-- MUST-07: 业务逻辑禁止内联魔法值
-- MUST-08: 定义新常量前查阅常量目录
-
-### 术语表 (`docs/terminology-glossary.md`)
-
-**用途：** 确保跨模块、跨智能体的命名和语义统一。
-
-| 索引 | 内容 | 使用场景 |
-|------|------|---------|
-| Term Index | 术语 + 自动推导定义 + 关联模块 + 关联术语 | 确认概念在项目中的通用名称 |
-| Term-to-Module | 术语在每个模块中的上下文和关联符号 | 理解术语在不同模块中的具体含义 |
-| Domain Cluster Map | 共现术语群组 | 理解业务领域的宏观结构 |
-| Terms with No Definition | 上下文不足以推导定义的术语 | 人工补充定义 |
-
-**强制规则 (§0.7.1)：**
-- MUST-09: 编写新符号前查阅术语表
-- MUST-10: 同一概念统一术语名称（禁止同义词）
-- MUST-11: 新领域概念注册到术语表
-- MUST-12: 未定义术语在 Phase 2/3 设计中明确化
-
-### 目录维护
-
-三份目录由 Scanner Agent 在 Phase 0 初始化时自动生成基线版本。后续维护方式：
-1. **增量维护：** 每次开发任务完成后，Dev Agent 在 Phase 5 Report 中声明新增/变更的公共方法、常量和术语
-2. **审核校验：** SE Agent 在 Phase 6 Code Review 时核查实际代码与目录的一致性
-3. **全量刷新：** Phase 0 重新扫描（项目结构变更、锁文件过期 >30 天）时自动全量刷新
+---
 
 ## 目录结构
 
 ```
-H5LifecycleTemplate/
-├── CLAUDE.md                              # 主编排器（框架入口）
+project/
+├── CLAUDE.md                              # 主编排器
 ├── README.md                              # 本文件
 ├── .claude/settings.json                  # Claude Code 配置
 ├── framework/
 │   ├── agents/                            # 智能体技能定义
-│   │   ├── project-scanner.skill.md        # 项目结构扫描
-│   │   ├── se-agent.skill.md
-│   │   ├── dev-agent.skill.md
-│   │   └── test-agent.skill.md
-│   ├── workflows/                         # 工作流规则
-│   │   ├── standard-lifecycle.rule.md     # 标准生命周期
-│   │   ├── challenge-mechanism.rule.md    # 挑战/纠偏机制
-│   │   └── plugin-extension.rule.md       # 插件扩展机制
-│   ├── artifacts/                         # 制品模板
+│   │   ├── project-scanner.skill.md        # Scanner Agent
+│   │   ├── se-agent.skill.md               # SE Agent
+│   │   ├── ux-agent.skill.md               # UX Agent (NEW)
+│   │   ├── dev-agent.skill.md              # Dev Agent
+│   │   └── test-agent.skill.md             # Test Agent
+│   ├── workflows/                         # 工作流规则 (8 个文件)
+│   │   ├── challenge-mechanism.rule.md     # 挑战/纠偏机制 (最高优先级)
+│   │   ├── plugin-extension.rule.md       # 插件扩展机制
+│   │   ├── ux-constraint.rule.md           # UX 约束强制机制 (NEW)
+│   │   ├── standard-lifecycle.rule.md     # 标准生命周期 (含 Phase 5.5/6.5/UX)
+│   │   ├── execution-protocol.rule.md     # 执行协议 (NEW)
+│   │   ├── initialization.rule.md         # Phase 0 初始化协议 (NEW)
+│   │   ├── requirement-model.rule.md      # 需求目录模型 (NEW)
+│   │   └── coding-standards-hierarchy.rule.md  # 编码规范层级 (NEW)
+│   ├── artifacts/                         # 制品模板 (9 个)
 │   │   ├── prd.template.md
 │   │   ├── se-design.template.md
+│   │   ├── ux-spec.template.md            # UX 需求规范模板 (NEW)
 │   │   ├── dev-story.template.md
 │   │   ├── test-plan.template.md
 │   │   ├── architecture-doc.template.md
@@ -372,36 +281,58 @@ H5LifecycleTemplate/
 │       ├── project-structure.template.md
 │       └── validation-standards.template.md
 ├── plugins/                               # 插件扩展
-│   ├── README.md
-│   └── example-plugin/
 └── docs/                                  # 生成文档
-    ├── .framework-init.lock               # 初始化锁文件（JSON）
-    ├── architecture.md                    # 共享 — 项目架构（Phase 0）
-    ├── module-map.md                      # 共享 — 模块对照表（Phase 0）
-    ├── coding-standards.md                # 共享 — 编码规范（Phase 0）
-    ├── project-structure.md               # 共享 — 项目结构（Phase 0）
-    ├── public-method-catalog.md           # 共享 — 公共方法全量目录（Phase 0）
-    ├── constant-catalog.md                # 共享 — 常量全量目录（Phase 0）
-    ├── terminology-glossary.md            # 共享 — 领域术语表（Phase 0）
-    ├── .scanner-report.json               # 共享 — 扫描数据（Phase 0，机器可读）
+    ├── .framework-init.lock               # 初始化锁文件（JSON，含 ui_stack）
+    ├── architecture.md                    # 项目架构
+    ├── module-map.md                      # 模块对照表（含关键词索引）
+    ├── coding-standards.md                # 编码规范（§0 含 §0.6 UX）
+    ├── ux-guidelines.md                   # UX 指南（UI 项目自动生成）
+    ├── project-structure.md               # 项目结构
+    ├── public-method-catalog.md           # 公共方法目录
+    ├── constant-catalog.md                # 常量目录
+    ├── terminology-glossary.md            # 领域术语表
+    ├── .scanner-report.json               # 扫描数据（机器可读）
     ├── challenges/
-    │   └── index.md                       # 全局挑战索引（跨需求）
-    ├── modules/                           # 大型项目分模块文档（Phase 0）
-    └── requirements/                      # 需求目录根
+    │   └── index.md                       # 全局挑战索引
+    ├── modules/                           # 分模块文档（大型项目）
+    └── requirements/                      # 需求隔离目录
         ├── index.md                       # 需求注册表
-        └── REQ-YYYY-NNN-{slug}/           # 需求隔离目录
-            ├── prd.md, se-design.md, dev-story.md, test-plan.md
-            ├── reports/                   # 阶段报告
+        └── REQ-YYYY-NNN-{slug}/
+            ├── prd.md
+            ├── se-design.md
+            ├── ux-spec.md                 # UX 需求规范（UI 需求）
+            ├── dev-story.md
+            ├── test-plan.md
+            ├── validation-report.md
+            ├── reports/                   # 阶段报告（含 phase-2.6-ux-spec-report.md）
             └── challenges/                # 挑战记录
 ```
+
+---
+
+## 工作流规则文件速查
+
+| 优先级 | 文件 | 用途 |
+|--------|------|------|
+| 0 | `challenge-mechanism.rule.md` | 挑战/纠偏机制（CAT-1/CAT-2/CAT-3） |
+| 1 | `plugin-extension.rule.md` | 12 个 Hook 点插件注入 |
+| 2 | `ux-constraint.rule.md` | UX 约束强制（PRD/Story UI 设计关卡） |
+| 3 | `standard-lifecycle.rule.md` | 7 阶段流程 + 快捷路径 + Phase 5.5/6.5 目录关卡 |
+| 4 | `execution-protocol.rule.md` | 9 步执行序列 |
+| 5 | `initialization.rule.md` | Phase 0 协议（含 UX 堆栈检测 Step 0.1.1） |
+| 6 | `requirement-model.rule.md` | 需求目录模型、REQ-ID 分配 |
+| 7 | `coding-standards-hierarchy.rule.md` | 二级编码规范 + §0.6 UX规范约定 |
+
+---
 
 ## 设计原则
 
 1. **模板驱动** — 所有智能体产出遵循统一模板，标准违背可被机械检测
-2. **挑战驱动迭代** — 挑战是核心迭代引擎，智能体主动发现需求遗漏(CAT-1)和规范违反(CAT-2)时立即发起，不等下游暴露
-3. **扫描驱动** — 项目结构、共享资源、模块依赖由 Scanner Agent 自动检测，编码规范中的模块组织规则由扫描结果驱动执行
-4. **需求隔离** — 每个需求拥有独立目录，制品/报告/挑战自包含，支持并行开发
-5. **阶段报告** — 每个阶段强制产出报告，形成完整的开发过程审计链
-6. **挑战留痕** — 每次挑战记录为独立文档，永久留存，可追溯
-7. **Hook 注入** — 12 个插件 Hook 点覆盖每个阶段转换，不修改核心流程即可扩展
-8. **强制初始化** — 所有生命周期操作前检查锁文件，确保项目信息完整准确
+2. **挑战驱动迭代** — 三大挑战类别（CAT-1 需求遗漏、CAT-2 规范违反、CAT-3 UX 规范违反）构成自校正迭代引擎
+3. **提取而非设计** — UX Agent 从已有设计产物中提取 UX 需求规范，不主动设计；CAT-3 只能基于明确规范条目
+4. **扫描驱动** — 项目结构、共享资源、模块依赖、UX 规范由 Scanner Agent 自动检测，编码规范由扫描结果驱动
+5. **需求隔离** — 每个需求拥有独立目录，制品/报告/挑战自包含，支持并行开发
+6. **阶段报告** — 每个阶段强制产出报告，形成完整的开发过程审计链
+7. **挑战留痕** — 每次挑战记录为独立文档，永久留存，可追溯
+8. **强制初始化** — 所有生命周期操作前检查锁文件，确保项目信息（含 UX 堆栈）完整准确
+9. **目录完整性** — 公共方法、常量、术语、UX 指南四份目录构成权威参考数据源，智能体编码前必须查阅
